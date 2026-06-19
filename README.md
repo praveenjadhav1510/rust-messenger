@@ -80,6 +80,12 @@ cargo install --path .
 | `publish-candidates` | `rust-messenger publish-candidates` | Publishes local ICE candidates to the registry. |
 | `refresh-candidates` | `rust-messenger refresh-candidates` | Regenerates and republish local ICE candidates. |
 | `fetch-candidates` | `rust-messenger fetch-candidates <username>` | Fetches and lists ICE candidates of a remote peer. |
+| `punch` | `rust-messenger punch <username>` | Establishes direct peer-to-peer UDP connectivity via simultaneous hole punching. |
+| `punch-status` | `rust-messenger punch-status <username>` | Displays the status of a UDP hole punching session. |
+| `listen` | `rust-messenger listen` | Starts the background packet receiver to listen for real-time messages. |
+| `send` | `rust-messenger send <username> "<message>"` | Sends an encrypted real-time message to a peer. |
+| `inbox` | `rust-messenger inbox` | Lists recent conversations and their total messages. |
+| `unread` | `rust-messenger unread` | Lists all unread incoming messages. |
 | `dev` | `rust-messenger dev <subcommand>` | Developer simulation tools (inject). |
 
 
@@ -102,6 +108,7 @@ All configuration, credentials, and state are stored in the user's home director
 ├── secure_sessions.json # Secure peer sessions metadata
 ├── ice_sessions.json # Selected working ICE candidate pairs
 ├── candidate_publication.json # Local candidate publication metadata
+├── punch_sessions.json # Persistent UDP hole punching sessions
 ├── contacts.json     # Local contact directory
 ├── requests.json     # Local message requests storage
 └── chats/            # Local chat storage directory
@@ -287,6 +294,32 @@ rust-messenger refresh-candidates
 
 # Fetch and list ICE candidates of a remote peer from the registry
 rust-messenger fetch-candidates <username>
+```
+
+### UDP Hole Punching
+Establish direct peer-to-peer UDP connectivity using simultaneous hole punching:
+```bash
+# Start simultaneous UDP hole punching with a peer
+rust-messenger punch <username>
+
+# Query the status of the UDP hole punching session with a peer
+rust-messenger punch-status <username>
+```
+
+### Real-Time Messaging
+Receive and transmit encrypted real-time messages over direct peer-to-peer UDP channels:
+```bash
+# Start background packet receiver to listen for incoming messages
+rust-messenger listen
+
+# Send an encrypted real-time message to an established peer
+rust-messenger send <username> "<message>"
+
+# Display recent conversations and message counts
+rust-messenger inbox
+
+# Display unread incoming messages only
+rust-messenger unread
 ```
 
 ### Local Simulator Testing

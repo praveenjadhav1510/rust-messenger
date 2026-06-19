@@ -11,10 +11,12 @@ mod contacts;
 mod crypto;
 mod handshake;
 mod ice;
+mod messaging;
 mod network;
 mod peer;
 mod presence;
 mod protocol;
+mod punch;
 mod registry;
 mod secure;
 mod session;
@@ -233,6 +235,16 @@ enum Commands {
         /// The username of the peer
         username: String,
     },
+    /// Perform UDP hole punching with a peer
+    Punch {
+        /// The username of the peer
+        username: String,
+    },
+    /// Query status of UDP hole punching session with a peer
+    PunchStatus {
+        /// The username of the peer
+        username: String,
+    },
     /// Publish local ICE candidates to the registry
     PublishCandidates,
     /// Regenerate and republish local ICE candidates to the registry
@@ -261,6 +273,19 @@ enum Commands {
     },
     /// Test local UDP transport functionality
     TestUdp,
+    /// Listen for incoming real-time messages
+    Listen,
+    /// Send a real-time encrypted message to a peer
+    Send {
+        /// The username of the peer
+        username: String,
+        /// The message body
+        message: String,
+    },
+    /// View inbox / recent conversations
+    Inbox,
+    /// View unread messages only
+    Unread,
     /// Developer utilities for local simulation
     Dev {
         #[command(subcommand)]
@@ -392,6 +417,12 @@ async fn main() -> Result<()> {
         Commands::IceCheck { username } => {
             commands::ice_check::exec(&username).await?;
         }
+        Commands::Punch { username } => {
+            commands::punch::exec(&username).await?;
+        }
+        Commands::PunchStatus { username } => {
+            commands::punch_status::exec(&username)?;
+        }
         Commands::PublishCandidates => {
             commands::publish_candidates::exec().await?;
         }
@@ -415,6 +446,18 @@ async fn main() -> Result<()> {
         }
         Commands::TestUdp => {
             commands::test_udp::exec()?;
+        }
+        Commands::Listen => {
+            commands::listen::exec().await?;
+        }
+        Commands::Send { username, message } => {
+            commands::send::exec(&username, &message).await?;
+        }
+        Commands::Inbox => {
+            commands::inbox::exec()?;
+        }
+        Commands::Unread => {
+            commands::unread::exec()?;
         }
         Commands::Dev { command } => match command {
             DevCommands::Inject { username, text } => {

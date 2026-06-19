@@ -44,7 +44,7 @@ pub fn exec_send(username: &str, text: &str) -> Result<()> {
         id: Uuid::new_v4(),
         direction: Direction::Outgoing,
         timestamp: Utc::now(),
-        status: MessageStatus::Pending,
+        status: MessageStatus::Queued,
         message_type: MessageType::Text,
         content: text.to_string(),
         signature: None,
@@ -60,6 +60,9 @@ pub fn exec_send(username: &str, text: &str) -> Result<()> {
 pub fn exec_history(username: &str) -> Result<()> {
     // Verify contact exists
     let contact = get_contact(username)?;
+
+    // Mark unread messages read when user opens message history
+    let _ = crate::messaging::receipts::mark_incoming_messages_read(&contact.username);
 
     let messages = crate::chat::storage::load_messages(&contact.username)?;
     let sender_label = capitalize(&contact.username);

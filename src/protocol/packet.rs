@@ -17,6 +17,10 @@ pub enum PacketType {
     ConnectivityCheck,
     ConnectivityResponse,
     Keepalive,
+    PunchProbe,
+    PunchAck,
+    MessageAck,
+    MessageRead,
 }
 
 impl std::fmt::Display for PacketType {
@@ -33,6 +37,10 @@ impl std::fmt::Display for PacketType {
             PacketType::ConnectivityCheck => write!(f, "CONNECTIVITY_CHECK"),
             PacketType::ConnectivityResponse => write!(f, "CONNECTIVITY_RESPONSE"),
             PacketType::Keepalive => write!(f, "KEEPALIVE"),
+            PacketType::PunchProbe => write!(f, "PUNCH_PROBE"),
+            PacketType::PunchAck => write!(f, "PUNCH_ACK"),
+            PacketType::MessageAck => write!(f, "MESSAGE_ACK"),
+            PacketType::MessageRead => write!(f, "MESSAGE_READ"),
         }
     }
 }

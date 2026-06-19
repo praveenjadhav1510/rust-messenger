@@ -36,7 +36,7 @@ pub fn send_local_message(
         id: Uuid::new_v4(),
         direction: Direction::Outgoing,
         timestamp: Utc::now(),
-        status: MessageStatus::Pending,
+        status: MessageStatus::Queued,
         message_type: MessageType::Text,
         content: content.to_string(),
         signature: None,
