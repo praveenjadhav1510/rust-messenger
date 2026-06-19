@@ -41,3 +41,86 @@ pub struct UserLookupResponse {
 pub struct ApiError {
     pub error: String,
 }
+
+#[derive(Serialize, Clone, Debug)]
+pub struct RecoverRequest {
+    pub username: String,
+    #[serde(rename = "recoveryCode")]
+    pub recovery_code: String,
+    #[serde(rename = "newPublicKey")]
+    pub new_public_key: String,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct RecoverResponse {
+    pub success: bool,
+    pub fingerprint: String,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct RenameRequest {
+    #[serde(rename = "currentUsername")]
+    pub current_username: String,
+    #[serde(rename = "newUsername")]
+    pub new_username: String,
+    #[serde(rename = "recoveryCode")]
+    pub recovery_code: String,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct RenameResponse {
+    pub success: bool,
+    pub username: String,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct RemoveRequest {
+    pub username: String,
+    #[serde(rename = "recoveryCode")]
+    pub recovery_code: String,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+#[allow(dead_code)]
+pub struct RemoveResponse {
+    pub success: bool,
+    pub message: String,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct RestoreRequest {
+    pub username: String,
+    #[serde(rename = "recoveryCode")]
+    pub recovery_code: String,
+    #[serde(rename = "newPublicKey")]
+    pub new_public_key: String,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct RestoreResponse {
+    pub success: bool,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct LockRequest {
+    pub username: String,
+    #[serde(rename = "recoveryCode")]
+    pub recovery_code: String,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct LockResponse {
+    pub success: bool,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct UnlockRequest {
+    pub username: String,
+    #[serde(rename = "recoveryCode")]
+    pub recovery_code: String,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct UnlockResponse {
+    pub success: bool,
+}

@@ -40,6 +40,27 @@ enum Commands {
         /// The username to look up
         username: String,
     },
+    /// Recover a username with a recovery code
+    Recover {
+        /// The username to recover
+        username: String,
+    },
+    /// Rename a registered identity
+    Rename {
+        /// The new username
+        new_username: String,
+    },
+    /// Deactivate/remove the current identity
+    Remove,
+    /// Restore a deactivated identity
+    Restore {
+        /// The username to restore
+        username: String,
+    },
+    /// Lock the current identity
+    Lock,
+    /// Unlock the current identity
+    Unlock,
 }
 
 #[tokio::main]
@@ -61,6 +82,24 @@ async fn main() -> Result<()> {
         }
         Commands::Lookup { username } => {
             commands::lookup::exec(&username).await?;
+        }
+        Commands::Recover { username } => {
+            commands::recover::exec(&username).await?;
+        }
+        Commands::Rename { new_username } => {
+            commands::rename::exec(&new_username).await?;
+        }
+        Commands::Remove => {
+            commands::remove::exec().await?;
+        }
+        Commands::Restore { username } => {
+            commands::restore::exec(&username).await?;
+        }
+        Commands::Lock => {
+            commands::lock::exec().await?;
+        }
+        Commands::Unlock => {
+            commands::unlock::exec().await?;
         }
     }
 

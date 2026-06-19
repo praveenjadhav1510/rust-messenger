@@ -53,9 +53,17 @@ pub fn read_profile() -> Result<Profile> {
 }
 
 pub fn write_profile(profile: &Profile) -> Result<()> {
+    let _dir = ensure_storage_dir()?;
     let path = get_storage_dir()?.join("profile.json");
     let content = serde_json::to_string_pretty(profile)?;
     fs::write(path, content)?;
+    Ok(())
+}
+
+pub fn write_keys(private_key_hex: &str, public_key_hex: &str) -> Result<()> {
+    let dir = ensure_storage_dir()?;
+    fs::write(dir.join("private.key"), private_key_hex)?;
+    fs::write(dir.join("public.key"), public_key_hex)?;
     Ok(())
 }
 

@@ -1,5 +1,7 @@
 use crate::registry::models::{
-    ApiError, CheckUsernameResponse, RegisterRequest, RegisterResponse, SearchResult,
+    ApiError, CheckUsernameResponse, LockRequest, LockResponse, RecoverRequest, RecoverResponse,
+    RegisterRequest, RegisterResponse, RemoveRequest, RemoveResponse, RenameRequest,
+    RenameResponse, RestoreRequest, RestoreResponse, SearchResult, UnlockRequest, UnlockResponse,
     UserLookupResponse,
 };
 use anyhow::{Result, anyhow};
@@ -16,6 +18,35 @@ impl RegistryClient {
             client: Client::new(),
             base_url,
         }
+    }
+
+    async fn post_request<Req, Resp>(
+        &self,
+        path: &str,
+        body: &Req,
+        action_name: &str,
+    ) -> Result<Resp>
+    where
+        Req: serde::Serialize,
+        Resp: serde::de::DeserializeOwned,
+    {
+        let url = format!("{}{}", self.base_url, path);
+        let res = self.client.post(&url).json(body).send().await?;
+        let status = res.status();
+
+        if !status.is_success() {
+            if let Ok(api_err) = res.json::<ApiError>().await {
+                return Err(anyhow!("{}", api_err.error));
+            }
+            return Err(anyhow!(
+                "{} failed with status code: {}",
+                action_name,
+                status
+            ));
+        }
+
+        let resp_body: Resp = res.json().await?;
+        Ok(resp_body)
     }
 
     pub async fn check_username(&self, username: &str) -> Result<bool> {
@@ -88,5 +119,79 @@ impl RegistryClient {
 
         let user: UserLookupResponse = res.json().await?;
         Ok(user)
+    }
+
+    pub async fn recover_account(
+        &self,
+        username: &str,
+        recovery_code: &str,
+        new_public_key: &str,
+    ) -> Result<RecoverResponse> {
+        let req = RecoverRequest {
+            username: username.to_string(),
+            recovery_code: recovery_code.to_string(),
+            new_public_key: new_public_key.to_string(),
+        };
+        self.post_request("/api/recover", &req, "Recover").await
+    }
+
+    pub async fn rename_account(
+        &self,
+        current_username: &str,
+        new_username: &str,
+        recovery_code: &str,
+    ) -> Result<RenameResponse> {
+        let req = RenameRequest {
+            current_username: current_username.to_string(),
+            new_username: new_username.to_string(),
+            recovery_code: recovery_code.to_string(),
+        };
+        self.post_request("/api/rename", &req, "Rename").await
+    }
+
+    pub async fn remove_account(
+        &self,
+        username: &str,
+        recovery_code: &str,
+    ) -> Result<RemoveResponse> {
+        let req = RemoveRequest {
+            username: username.to_string(),
+            recovery_code: recovery_code.to_string(),
+        };
+        self.post_request("/api/remove", &req, "Remove").await
+    }
+
+    pub async fn restore_account(
+        &self,
+        username: &str,
+        recovery_code: &str,
+        new_public_key: &str,
+    ) -> Result<RestoreResponse> {
+        let req = RestoreRequest {
+            username: username.to_string(),
+            recovery_code: recovery_code.to_string(),
+            new_public_key: new_public_key.to_string(),
+        };
+        self.post_request("/api/restore", &req, "Restore").await
+    }
+
+    pub async fn lock_account(&self, username: &str, recovery_code: &str) -> Result<LockResponse> {
+        let req = LockRequest {
+            username: username.to_string(),
+            recovery_code: recovery_code.to_string(),
+        };
+        self.post_request("/api/lock", &req, "Lock").await
+    }
+
+    pub async fn unlock_account(
+        &self,
+        username: &str,
+        recovery_code: &str,
+    ) -> Result<UnlockResponse> {
+        let req = UnlockRequest {
+            username: username.to_string(),
+            recovery_code: recovery_code.to_string(),
+        };
+        self.post_request("/api/unlock", &req, "Unlock").await
     }
 }

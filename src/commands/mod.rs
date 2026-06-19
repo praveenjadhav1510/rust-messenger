@@ -1,5 +1,11 @@
 pub mod init;
+pub mod lock;
 pub mod lookup;
+pub mod recover;
 pub mod register;
+pub mod remove;
+pub mod rename;
+pub mod restore;
 pub mod search;
+pub mod unlock;
 pub mod whoami;
