@@ -5,10 +5,17 @@ use clap::{Parser, Subcommand};
 mod chat;
 mod commands;
 mod config;
+mod connection;
 mod contacts;
 mod crypto;
+mod handshake;
+mod network;
+mod peer;
+mod presence;
 mod protocol;
 mod registry;
+mod secure;
+mod session;
 mod storage;
 mod transport;
 
@@ -186,6 +193,53 @@ enum Commands {
         #[command(subcommand)]
         command: ConversationCommands,
     },
+    /// Announce that the identity is online
+    Online,
+    /// Mark the local session and registry status offline
+    Offline,
+    /// Query the registry for a user's presence status
+    Status {
+        /// The username to query
+        username: String,
+    },
+    /// Connect to a peer
+    Connect {
+        /// The username to connect to
+        username: String,
+    },
+    /// Disconnect from a peer
+    Disconnect {
+        /// The username to disconnect from
+        username: String,
+    },
+    /// List all active peer sessions
+    Peers,
+    /// Ping a connected peer
+    Ping {
+        /// The username to ping
+        username: String,
+    },
+    /// Discover NAT type and local network interface details
+    Netinfo,
+    /// Discover peer details (online status, capabilities, and candidates)
+    Discover {
+        /// The username of the peer to discover
+        username: String,
+    },
+    /// Negotiate a connection with a peer contact
+    Negotiate {
+        /// The username of the peer to negotiate with
+        username: String,
+    },
+    /// Display local client capabilities
+    Capabilities,
+    /// Establish a secure encrypted session with a peer
+    SecureSession {
+        /// The username of the peer
+        username: String,
+    },
+    /// Test local UDP transport functionality
+    TestUdp,
     /// Developer utilities for local simulation
     Dev {
         #[command(subcommand)]
@@ -287,6 +341,45 @@ async fn main() -> Result<()> {
                 commands::conversation::exec_show(&username)?;
             }
         },
+        Commands::Online => {
+            commands::online::exec().await?;
+        }
+        Commands::Offline => {
+            commands::offline::exec().await?;
+        }
+        Commands::Status { username } => {
+            commands::status::exec(&username).await?;
+        }
+        Commands::Connect { username } => {
+            commands::connect::exec(&username).await?;
+        }
+        Commands::Disconnect { username } => {
+            commands::disconnect::exec(&username)?;
+        }
+        Commands::Peers => {
+            commands::peers::exec()?;
+        }
+        Commands::Ping { username } => {
+            commands::ping::exec(&username).await?;
+        }
+        Commands::Netinfo => {
+            commands::netinfo::exec().await?;
+        }
+        Commands::Discover { username } => {
+            commands::discover::exec(&username).await?;
+        }
+        Commands::Negotiate { username } => {
+            commands::negotiate::exec(&username).await?;
+        }
+        Commands::Capabilities => {
+            commands::capabilities::exec()?;
+        }
+        Commands::SecureSession { username } => {
+            commands::secure_session::exec(&username).await?;
+        }
+        Commands::TestUdp => {
+            commands::test_udp::exec()?;
+        }
         Commands::Dev { command } => match command {
             DevCommands::Inject { username, text } => {
                 commands::dev::exec_inject(&username, &text)?;

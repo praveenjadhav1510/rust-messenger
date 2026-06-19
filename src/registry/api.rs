@@ -1,8 +1,9 @@
 use crate::registry::models::{
-    ApiError, CheckUsernameResponse, LockRequest, LockResponse, RecoverRequest, RecoverResponse,
-    RegisterRequest, RegisterResponse, RemoveRequest, RemoveResponse, RenameRequest,
-    RenameResponse, RestoreRequest, RestoreResponse, SearchResult, UnlockRequest, UnlockResponse,
-    UserLookupResponse,
+    ApiError, CandidatesResponse, CheckUsernameResponse, HeartbeatRequest, HeartbeatResponse,
+    LockRequest, LockResponse, OfflineRequest, OfflineResponse, PresenceResponse, RecoverRequest,
+    RecoverResponse, RegisterRequest, RegisterResponse, RemoveRequest, RemoveResponse,
+    RenameRequest, RenameResponse, RestoreRequest, RestoreResponse, SearchResult, UnlockRequest,
+    UnlockResponse, UserLookupResponse,
 };
 use anyhow::{Result, anyhow};
 use reqwest::Client;
@@ -193,5 +194,72 @@ impl RegistryClient {
             recovery_code: recovery_code.to_string(),
         };
         self.post_request("/api/unlock", &req, "Unlock").await
+    }
+
+    pub async fn send_heartbeat(
+        &self,
+        username: &str,
+        session_id: &str,
+        client_version: &str,
+    ) -> Result<HeartbeatResponse> {
+        let req = HeartbeatRequest {
+            username: username.to_string(),
+            session_id: session_id.to_string(),
+            client_version: client_version.to_string(),
+        };
+        self.post_request("/api/presence/heartbeat", &req, "Heartbeat")
+            .await
+    }
+
+    pub async fn get_presence(&self, username: &str) -> Result<PresenceResponse> {
+        let url = format!("{}/api/presence/{}", self.base_url, username);
+        let res = self.client.get(&url).send().await?;
+        let status = res.status();
+
+        if status.as_u16() == 404 {
+            return Err(anyhow!("User not found."));
+        }
+
+        if !status.is_success() {
+            if let Ok(api_err) = res.json::<ApiError>().await {
+                return Err(anyhow!("Get presence failed: {}", api_err.error));
+            }
+            return Err(anyhow!("Get presence failed with status code: {}", status));
+        }
+
+        let presence: PresenceResponse = res.json().await?;
+        Ok(presence)
+    }
+
+    pub async fn set_offline(&self, username: &str, session_id: &str) -> Result<OfflineResponse> {
+        let req = OfflineRequest {
+            username: username.to_string(),
+            session_id: session_id.to_string(),
+        };
+        self.post_request("/api/presence/offline", &req, "Offline")
+            .await
+    }
+
+    pub async fn get_candidates(&self, username: &str) -> Result<CandidatesResponse> {
+        let url = format!("{}/api/candidates/{}", self.base_url, username);
+        let res = self.client.get(&url).send().await?;
+        let status = res.status();
+
+        if status.as_u16() == 404 {
+            return Err(anyhow!("User not found."));
+        }
+
+        if !status.is_success() {
+            if let Ok(api_err) = res.json::<ApiError>().await {
+                return Err(anyhow!("Get candidates failed: {}", api_err.error));
+            }
+            return Err(anyhow!(
+                "Get candidates failed with status code: {}",
+                status
+            ));
+        }
+
+        let candidates_resp: CandidatesResponse = res.json().await?;
+        Ok(candidates_resp)
     }
 }

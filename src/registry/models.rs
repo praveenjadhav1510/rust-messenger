@@ -124,3 +124,49 @@ pub struct UnlockRequest {
 pub struct UnlockResponse {
     pub success: bool,
 }
+
+#[derive(Serialize, Clone, Debug)]
+pub struct HeartbeatRequest {
+    pub username: String,
+    #[serde(rename = "sessionId")]
+    pub session_id: String,
+    #[serde(rename = "clientVersion")]
+    pub client_version: String,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct HeartbeatResponse {
+    pub success: bool,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct PresenceResponse {
+    pub username: String,
+    pub online: bool,
+    #[serde(rename = "sessionId")]
+    pub session_id: Option<String>,
+    #[serde(rename = "lastSeen")]
+    pub last_seen: Option<String>,
+    #[serde(rename = "clientVersion")]
+    pub client_version: Option<String>,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct OfflineRequest {
+    pub username: String,
+    #[serde(rename = "sessionId")]
+    pub session_id: String,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct OfflineResponse {
+    pub success: bool,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct CandidatesResponse {
+    pub username: String,
+    #[serde(rename = "sessionId")]
+    pub session_id: String,
+    pub candidates: Vec<crate::network::candidate::IceCandidate>,
+}

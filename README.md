@@ -62,6 +62,19 @@ cargo install --path .
 | `requests` | `rust-messenger requests <subcommand>` | Manages message requests locally (list, accept, reject). |
 | `message` | `rust-messenger message <subcommand>` | Manages messages locally (send, history, list, clear). |
 | `conversation` | `rust-messenger conversation <subcommand>` | Manages conversation metadata (show). |
+| `online` | `rust-messenger online` | Announce that the identity is online. |
+| `offline` | `rust-messenger offline` | Mark the local session and registry status offline. |
+| `status` | `rust-messenger status <username>` | Query the registry for a user's presence status. |
+| `connect` | `rust-messenger connect <username>` | Connects to a peer contact. |
+| `disconnect` | `rust-messenger disconnect <username>` | Disconnects from a peer and removes the session. |
+| `peers` | `rust-messenger peers` | Lists all active peer sessions. |
+| `ping` | `rust-messenger ping <username>` | Sends a diagnostic ping to a connected peer. |
+| `netinfo` | `rust-messenger netinfo` | Discovers NAT type, local interfaces, and ICE candidates. |
+| `discover` | `rust-messenger discover <username>` | Discovers a peer's status, capabilities, and candidates. |
+| `negotiate` | `rust-messenger negotiate <username>` | Negotiates connection parameters and selects candidates. |
+| `capabilities` | `rust-messenger capabilities` | Displays local client capabilities. |
+| `secure-session` | `rust-messenger secure-session <username>` | Establishes a secure encrypted session with a peer. |
+| `test-udp` | `rust-messenger test-udp` | Tests local UDP transport loopback functionality. |
 | `dev` | `rust-messenger dev <subcommand>` | Developer simulation tools (inject). |
 
 
@@ -76,6 +89,12 @@ All configuration, credentials, and state are stored in the user's home director
 ├── private.key       # Ed25519 private key (keep confidential)
 ├── public.key        # Ed25519 public key (shared registry identity)
 ├── profile.json      # Current user profile metadata
+├── session.json      # Current user active session metadata
+├── active_sessions.json # Active peer sessions list
+├── candidates.json   # Discovered ICE candidates list
+├── capabilities.json # Local client capabilities list
+├── handshakes.json   # Handshake negotiations history
+├── secure_sessions.json # Secure peer sessions metadata
 ├── contacts.json     # Local contact directory
 ├── requests.json     # Local message requests storage
 └── chats/            # Local chat storage directory
@@ -183,6 +202,61 @@ Show metadata of a conversation:
 ```bash
 # Display conversation metadata (Fingerprint, Trust Level, Total Messages, Last Activity)
 rust-messenger conversation show <username>
+```
+
+### Presence & Session Management
+Manage user presence and status:
+```bash
+# Announce that you are online and start a heartbeat session
+rust-messenger online
+
+# Announce that you are offline and stop the session
+rust-messenger offline
+
+# Query the status of a specific user on the registry
+rust-messenger status <username>
+```
+
+### Connection & Transport Lifecycle
+Manage connections to peer contacts:
+```bash
+# Connect to a contact (verifies identity, blocked status, online presence, and starts session)
+rust-messenger connect <username>
+
+# Disconnect from an active peer and remove their session
+rust-messenger disconnect <username>
+
+# List all active peer sessions and their transport details
+rust-messenger peers
+
+# Send a diagnostics ping to a connected peer
+rust-messenger ping <username>
+
+# Discover local IPv4 interfaces, query STUN for public IP/port, and generate ICE candidates
+rust-messenger netinfo
+```
+
+### Peer Discovery & Handshake Protocol
+Discover peers, check capabilities, and negotiate connections:
+```bash
+# Discover a peer's status, capabilities, and candidates
+rust-messenger discover <username>
+
+# Negotiate connection parameters and select candidates with a peer
+rust-messenger negotiate <username>
+
+# Display local client capabilities
+rust-messenger capabilities
+```
+
+### UDP Transport & Secure Session Bootstrap
+Establish secure sessions and test network transport layers:
+```bash
+# Verify connection, generate ephemeral keys, derive shared secret, and bootstrap a secure session
+rust-messenger secure-session <username>
+
+# Bind a local UDP socket and send/receive a test packet to verify transport loopback functionality
+rust-messenger test-udp
 ```
 
 ### Local Simulator Testing
