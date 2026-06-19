@@ -77,6 +77,9 @@ cargo install --path .
 | `test-udp` | `rust-messenger test-udp` | Tests local UDP transport loopback functionality. |
 | `candidate-pairs` | `rust-messenger candidate-pairs <username>` | Lists prioritized ICE candidate pairs for a peer. |
 | `ice-check` | `rust-messenger ice-check <username>` | Performs ICE connectivity checks and selects the best working pair. |
+| `publish-candidates` | `rust-messenger publish-candidates` | Publishes local ICE candidates to the registry. |
+| `refresh-candidates` | `rust-messenger refresh-candidates` | Regenerates and republish local ICE candidates. |
+| `fetch-candidates` | `rust-messenger fetch-candidates <username>` | Fetches and lists ICE candidates of a remote peer. |
 | `dev` | `rust-messenger dev <subcommand>` | Developer simulation tools (inject). |
 
 
@@ -98,6 +101,7 @@ All configuration, credentials, and state are stored in the user's home director
 ├── handshakes.json   # Handshake negotiations history
 ├── secure_sessions.json # Secure peer sessions metadata
 ├── ice_sessions.json # Selected working ICE candidate pairs
+├── candidate_publication.json # Local candidate publication metadata
 ├── contacts.json     # Local contact directory
 ├── requests.json     # Local message requests storage
 └── chats/            # Local chat storage directory
@@ -270,6 +274,19 @@ rust-messenger candidate-pairs <username>
 
 # Run ICE connectivity checks, select working pair, and persist results
 rust-messenger ice-check <username>
+```
+
+### Candidate Publishing
+Publish and fetch ICE candidates via the registry:
+```bash
+# Publish local ICE candidates to the registry
+rust-messenger publish-candidates
+
+# Regenerate and republish local ICE candidates to the registry
+rust-messenger refresh-candidates
+
+# Fetch and list ICE candidates of a remote peer from the registry
+rust-messenger fetch-candidates <username>
 ```
 
 ### Local Simulator Testing

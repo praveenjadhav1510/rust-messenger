@@ -170,3 +170,17 @@ pub struct CandidatesResponse {
     pub session_id: String,
     pub candidates: Vec<crate::network::candidate::IceCandidate>,
 }
+
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct PublishCandidatesRequest {
+    pub username: String,
+    #[serde(rename = "sessionId")]
+    pub session_id: String,
+    pub candidates: Vec<crate::network::candidate::IceCandidate>,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub struct PublishCandidatesResponse {
+    pub success: bool,
+}

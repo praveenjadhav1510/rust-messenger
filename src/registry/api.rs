@@ -1,9 +1,10 @@
 use crate::registry::models::{
     ApiError, CandidatesResponse, CheckUsernameResponse, HeartbeatRequest, HeartbeatResponse,
-    LockRequest, LockResponse, OfflineRequest, OfflineResponse, PresenceResponse, RecoverRequest,
-    RecoverResponse, RegisterRequest, RegisterResponse, RemoveRequest, RemoveResponse,
-    RenameRequest, RenameResponse, RestoreRequest, RestoreResponse, SearchResult, UnlockRequest,
-    UnlockResponse, UserLookupResponse,
+    LockRequest, LockResponse, OfflineRequest, OfflineResponse, PresenceResponse,
+    PublishCandidatesRequest, PublishCandidatesResponse, RecoverRequest, RecoverResponse,
+    RegisterRequest, RegisterResponse, RemoveRequest, RemoveResponse, RenameRequest,
+    RenameResponse, RestoreRequest, RestoreResponse, SearchResult, UnlockRequest, UnlockResponse,
+    UserLookupResponse,
 };
 use anyhow::{Result, anyhow};
 use reqwest::Client;
@@ -261,5 +262,43 @@ impl RegistryClient {
 
         let candidates_resp: CandidatesResponse = res.json().await?;
         Ok(candidates_resp)
+    }
+
+    pub async fn publish_candidates(
+        &self,
+        username: &str,
+        session_id: &str,
+        candidates: &[crate::network::candidate::IceCandidate],
+    ) -> Result<PublishCandidatesResponse> {
+        let req = PublishCandidatesRequest {
+            username: username.to_string(),
+            session_id: session_id.to_string(),
+            candidates: candidates.to_vec(),
+        };
+        self.post_request("/api/candidates/publish", &req, "PublishCandidates")
+            .await
+    }
+
+    pub async fn delete_candidates(&self, username: &str) -> Result<bool> {
+        let url = format!("{}/api/candidates/{}", self.base_url, username);
+        let res = self.client.delete(&url).send().await?;
+        let status = res.status();
+
+        if !status.is_success() {
+            if let Ok(api_err) = res.json::<ApiError>().await {
+                return Err(anyhow!("Delete candidates failed: {}", api_err.error));
+            }
+            return Err(anyhow!(
+                "Delete candidates failed with status code: {}",
+                status
+            ));
+        }
+
+        #[derive(serde::Deserialize)]
+        struct DeleteResponse {
+            success: bool,
+        }
+        let resp: DeleteResponse = res.json().await?;
+        Ok(resp.success)
     }
 }

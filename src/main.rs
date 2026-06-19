@@ -2,6 +2,7 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 
+mod candidates;
 mod chat;
 mod commands;
 mod config;
@@ -232,6 +233,15 @@ enum Commands {
         /// The username of the peer
         username: String,
     },
+    /// Publish local ICE candidates to the registry
+    PublishCandidates,
+    /// Regenerate and republish local ICE candidates to the registry
+    RefreshCandidates,
+    /// Fetch ICE candidates of a remote peer from the registry
+    FetchCandidates {
+        /// The username of the peer
+        username: String,
+    },
     /// Discover peer details (online status, capabilities, and candidates)
     Discover {
         /// The username of the peer to discover
@@ -381,6 +391,15 @@ async fn main() -> Result<()> {
         }
         Commands::IceCheck { username } => {
             commands::ice_check::exec(&username).await?;
+        }
+        Commands::PublishCandidates => {
+            commands::publish_candidates::exec().await?;
+        }
+        Commands::RefreshCandidates => {
+            commands::refresh_candidates::exec().await?;
+        }
+        Commands::FetchCandidates { username } => {
+            commands::fetch_candidates::exec(&username).await?;
         }
         Commands::Discover { username } => {
             commands::discover::exec(&username).await?;
