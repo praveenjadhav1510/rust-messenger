@@ -48,6 +48,22 @@ cargo install --path .
 | `register` | `rust-messenger register <username>` | Registers your public identity on the global registry. |
 | `search` | `rust-messenger search <query>` | Searches for registered usernames. |
 | `lookup` | `rust-messenger lookup <username>` | Retrieves metadata and public key for a specific user. |
+| `recover` | `rust-messenger recover <username>` | Recovers a username using a recovery code and new public key. |
+| `rename` | `rust-messenger rename <new_username>` | Renames the current registered username. |
+| `remove` | `rust-messenger remove` | Deactivates and removes the current identity. |
+| `restore` | `rust-messenger restore <username>` | Restores a deactivated identity with a new public key. |
+| `lock` | `rust-messenger lock` | Cryptographically locks the current identity. |
+| `unlock` | `rust-messenger unlock` | Unlocks the current identity using the recovery code. |
+| `contacts` | `rust-messenger contacts <subcommand>` | Manages contacts locally (add, remove, list, show). |
+| `verify` | `rust-messenger verify <username>` | Verifies a local contact's identity. |
+| `unverify` | `rust-messenger unverify <username>` | Unverifies a local contact. |
+| `block` | `rust-messenger block <username>` | Blocks a local contact from future messages. |
+| `unblock` | `rust-messenger unblock <username>` | Unblocks a blocked local contact. |
+| `requests` | `rust-messenger requests <subcommand>` | Manages message requests locally (list, accept, reject). |
+| `message` | `rust-messenger message <subcommand>` | Manages messages locally (send, history, list, clear). |
+| `conversation` | `rust-messenger conversation <subcommand>` | Manages conversation metadata (show). |
+| `dev` | `rust-messenger dev <subcommand>` | Developer simulation tools (inject). |
+
 
 ---
 
@@ -57,10 +73,14 @@ All configuration, credentials, and state are stored in the user's home director
 
 ```text
 ~/.rust-messenger/
-├── private.key      # Ed25519 private key (keep confidential)
-├── public.key       # Ed25519 public key (shared registry identity)
-├── profile.json     # Current user profile metadata
-└── contacts.json    # Local contact directory (reserved for future phases)
+├── private.key       # Ed25519 private key (keep confidential)
+├── public.key        # Ed25519 public key (shared registry identity)
+├── profile.json      # Current user profile metadata
+├── contacts.json     # Local contact directory
+├── requests.json     # Local message requests storage
+└── chats/            # Local chat storage directory
+    └── <username>/
+        └── messages.json # History of messages with a specific contact
 ```
 
 ---
@@ -97,15 +117,90 @@ rust-messenger search <query>
 rust-messenger lookup <exact-username>
 ```
 
+### Contacts Management
+Manage local contacts list:
+```bash
+# Add a contact from the registry
+rust-messenger contacts add <username>
+
+# Remove a contact locally
+rust-messenger contacts remove <username>
+
+# List all contacts in a compact table
+rust-messenger contacts list
+
+# Show detailed information of a contact
+rust-messenger contacts show <username>
+```
+
+### Trust Verification
+Verify or block local contacts:
+```bash
+# Verify a contact's identity locally
+rust-messenger verify <username>
+
+# Remove verification status from a contact
+rust-messenger unverify <username>
+
+# Block a contact locally
+rust-messenger block <username>
+
+# Unblock a contact locally
+rust-messenger unblock <username>
+```
+
+### Message Requests
+Manage message requests:
+```bash
+# List all message requests
+rust-messenger requests list
+
+# Accept a message request
+rust-messenger requests accept <username>
+
+# Reject a message request
+rust-messenger requests reject <username>
+```
+
+### Messaging Engine
+Manage messages locally:
+```bash
+# Send a message to a contact
+rust-messenger message send <username> "<message-text>"
+
+# Display message history for a contact (oldest at top, newest at bottom)
+rust-messenger message history <username>
+
+# List all active conversations sorted by last activity
+rust-messenger message list
+
+# Clear all conversation history for a contact (with YES confirmation)
+rust-messenger message clear <username>
+```
+
+### Conversation Management
+Show metadata of a conversation:
+```bash
+# Display conversation metadata (Fingerprint, Trust Level, Total Messages, Last Activity)
+rust-messenger conversation show <username>
+```
+
+### Local Simulator Testing
+Inject an incoming message locally:
+```bash
+# Simulate a received message from a contact
+rust-messenger dev inject <username> "<message-text>"
+```
+
 ---
 
 ## Project Roadmap
 
 ```text
-Phase 1: Identity & Registry Client (Current)
-  └── Phase 2: Peer-to-Peer Networking & Transport Encryption
-        └── Phase 3: Terminal User Interface (Ratatui)
-              └── Phase 4: Encrypted P2P Messaging & File Transfer
+Phase 1: Identity & Registry Client
+  └── Phase 3: Core Messaging Foundation (Current)
+        └── Phase 4: Peer-to-Peer Networking & Transport Encryption
+              └── Phase 5: Terminal User Interface (Ratatui)
 ```
 
 ---
@@ -113,3 +208,4 @@ Phase 1: Identity & Registry Client (Current)
 ## License
 
 Distributed under the MIT License.
+

@@ -1,11 +1,16 @@
+#![allow(dead_code, unused_imports)]
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 
+mod chat;
 mod commands;
 mod config;
+mod contacts;
 mod crypto;
+mod protocol;
 mod registry;
 mod storage;
+mod transport;
 
 #[derive(Parser)]
 #[command(name = "rust-messenger")]
@@ -13,6 +18,86 @@ mod storage;
 struct Cli {
     #[command(subcommand)]
     command: Commands,
+}
+
+#[derive(Subcommand)]
+enum ContactsCommands {
+    /// Add a contact from the registry
+    Add {
+        /// The username to add
+        username: String,
+    },
+    /// Remove a contact locally
+    Remove {
+        /// The username to remove
+        username: String,
+    },
+    /// List all local contacts
+    List,
+    /// Show detailed info for a contact
+    Show {
+        /// The username to show
+        username: String,
+    },
+}
+
+#[derive(Subcommand)]
+enum RequestsCommands {
+    /// List all local message requests
+    List,
+    /// Accept a pending message request
+    Accept {
+        /// The username to accept
+        username: String,
+    },
+    /// Reject a pending message request
+    Reject {
+        /// The username to reject
+        username: String,
+    },
+}
+
+#[derive(Subcommand)]
+enum MessageCommands {
+    /// Send a message to a contact
+    Send {
+        /// The contact username
+        username: String,
+        /// The message body
+        text: String,
+    },
+    /// Display message history for a contact
+    History {
+        /// The contact username
+        username: String,
+    },
+    /// List all active conversations
+    List,
+    /// Clear conversation history for a contact
+    Clear {
+        /// The contact username
+        username: String,
+    },
+}
+
+#[derive(Subcommand)]
+enum ConversationCommands {
+    /// Show detailed metadata for a conversation
+    Show {
+        /// The contact username
+        username: String,
+    },
+}
+
+#[derive(Subcommand)]
+enum DevCommands {
+    /// Inject a local incoming message for testing
+    Inject {
+        /// The sender username
+        username: String,
+        /// The message body
+        text: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -61,6 +146,51 @@ enum Commands {
     Lock,
     /// Unlock the current identity
     Unlock,
+    /// Manage contacts locally
+    Contacts {
+        #[command(subcommand)]
+        command: ContactsCommands,
+    },
+    /// Verify a contact's identity locally
+    Verify {
+        /// The username to verify
+        username: String,
+    },
+    /// Unverify a contact locally
+    Unverify {
+        /// The username to unverify
+        username: String,
+    },
+    /// Block a contact locally
+    Block {
+        /// The username to block
+        username: String,
+    },
+    /// Unblock a contact locally
+    Unblock {
+        /// The username to unblock
+        username: String,
+    },
+    /// Manage message requests locally
+    Requests {
+        #[command(subcommand)]
+        command: RequestsCommands,
+    },
+    /// Manage messages locally
+    Message {
+        #[command(subcommand)]
+        command: MessageCommands,
+    },
+    /// Manage conversations locally
+    Conversation {
+        #[command(subcommand)]
+        command: ConversationCommands,
+    },
+    /// Developer utilities for local simulation
+    Dev {
+        #[command(subcommand)]
+        command: DevCommands,
+    },
 }
 
 #[tokio::main]
@@ -101,6 +231,67 @@ async fn main() -> Result<()> {
         Commands::Unlock => {
             commands::unlock::exec().await?;
         }
+        Commands::Contacts { command } => match command {
+            ContactsCommands::Add { username } => {
+                commands::contacts::exec_add(&username).await?;
+            }
+            ContactsCommands::Remove { username } => {
+                commands::contacts::exec_remove(&username)?;
+            }
+            ContactsCommands::List => {
+                commands::contacts::exec_list()?;
+            }
+            ContactsCommands::Show { username } => {
+                commands::contacts::exec_show(&username)?;
+            }
+        },
+        Commands::Verify { username } => {
+            commands::verify::exec_verify(&username)?;
+        }
+        Commands::Unverify { username } => {
+            commands::verify::exec_unverify(&username)?;
+        }
+        Commands::Block { username } => {
+            commands::block::exec_block(&username)?;
+        }
+        Commands::Unblock { username } => {
+            commands::block::exec_unblock(&username)?;
+        }
+        Commands::Requests { command } => match command {
+            RequestsCommands::List => {
+                commands::requests::exec_list()?;
+            }
+            RequestsCommands::Accept { username } => {
+                commands::requests::exec_accept(&username)?;
+            }
+            RequestsCommands::Reject { username } => {
+                commands::requests::exec_reject(&username)?;
+            }
+        },
+        Commands::Message { command } => match command {
+            MessageCommands::Send { username, text } => {
+                commands::message::exec_send(&username, &text)?;
+            }
+            MessageCommands::History { username } => {
+                commands::message::exec_history(&username)?;
+            }
+            MessageCommands::List => {
+                commands::message::exec_list()?;
+            }
+            MessageCommands::Clear { username } => {
+                commands::message::exec_clear(&username)?;
+            }
+        },
+        Commands::Conversation { command } => match command {
+            ConversationCommands::Show { username } => {
+                commands::conversation::exec_show(&username)?;
+            }
+        },
+        Commands::Dev { command } => match command {
+            DevCommands::Inject { username, text } => {
+                commands::dev::exec_inject(&username, &text)?;
+            }
+        },
     }
 
     Ok(())
