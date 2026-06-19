@@ -1,4 +1,5 @@
 pub mod block;
+pub mod candidate_pairs;
 pub mod capabilities;
 pub mod connect;
 pub mod contacts;
@@ -6,6 +7,7 @@ pub mod conversation;
 pub mod dev;
 pub mod disconnect;
 pub mod discover;
+pub mod ice_check;
 pub mod init;
 pub mod lock;
 pub mod lookup;

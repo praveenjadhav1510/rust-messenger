@@ -9,6 +9,7 @@ mod connection;
 mod contacts;
 mod crypto;
 mod handshake;
+mod ice;
 mod network;
 mod peer;
 mod presence;
@@ -221,6 +222,16 @@ enum Commands {
     },
     /// Discover NAT type and local network interface details
     Netinfo,
+    /// List prioritized ICE candidate pairs for a peer
+    CandidatePairs {
+        /// The username of the peer
+        username: String,
+    },
+    /// Execute ICE connectivity checks with a peer
+    IceCheck {
+        /// The username of the peer
+        username: String,
+    },
     /// Discover peer details (online status, capabilities, and candidates)
     Discover {
         /// The username of the peer to discover
@@ -364,6 +375,12 @@ async fn main() -> Result<()> {
         }
         Commands::Netinfo => {
             commands::netinfo::exec().await?;
+        }
+        Commands::CandidatePairs { username } => {
+            commands::candidate_pairs::exec(&username).await?;
+        }
+        Commands::IceCheck { username } => {
+            commands::ice_check::exec(&username).await?;
         }
         Commands::Discover { username } => {
             commands::discover::exec(&username).await?;

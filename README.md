@@ -75,6 +75,8 @@ cargo install --path .
 | `capabilities` | `rust-messenger capabilities` | Displays local client capabilities. |
 | `secure-session` | `rust-messenger secure-session <username>` | Establishes a secure encrypted session with a peer. |
 | `test-udp` | `rust-messenger test-udp` | Tests local UDP transport loopback functionality. |
+| `candidate-pairs` | `rust-messenger candidate-pairs <username>` | Lists prioritized ICE candidate pairs for a peer. |
+| `ice-check` | `rust-messenger ice-check <username>` | Performs ICE connectivity checks and selects the best working pair. |
 | `dev` | `rust-messenger dev <subcommand>` | Developer simulation tools (inject). |
 
 
@@ -95,6 +97,7 @@ All configuration, credentials, and state are stored in the user's home director
 ├── capabilities.json # Local client capabilities list
 ├── handshakes.json   # Handshake negotiations history
 ├── secure_sessions.json # Secure peer sessions metadata
+├── ice_sessions.json # Selected working ICE candidate pairs
 ├── contacts.json     # Local contact directory
 ├── requests.json     # Local message requests storage
 └── chats/            # Local chat storage directory
@@ -257,6 +260,16 @@ rust-messenger secure-session <username>
 
 # Bind a local UDP socket and send/receive a test packet to verify transport loopback functionality
 rust-messenger test-udp
+```
+
+### ICE Connectivity Checks
+Verify candidate pair reachability and keepalive:
+```bash
+# List prioritized candidate pairs for a peer
+rust-messenger candidate-pairs <username>
+
+# Run ICE connectivity checks, select working pair, and persist results
+rust-messenger ice-check <username>
 ```
 
 ### Local Simulator Testing

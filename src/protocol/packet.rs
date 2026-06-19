@@ -14,6 +14,9 @@ pub enum PacketType {
     Presence,
     FileMetadata,
     FileChunk,
+    ConnectivityCheck,
+    ConnectivityResponse,
+    Keepalive,
 }
 
 impl std::fmt::Display for PacketType {
@@ -27,6 +30,9 @@ impl std::fmt::Display for PacketType {
             PacketType::Presence => write!(f, "PRESENCE"),
             PacketType::FileMetadata => write!(f, "FILE_METADATA"),
             PacketType::FileChunk => write!(f, "FILE_CHUNK"),
+            PacketType::ConnectivityCheck => write!(f, "CONNECTIVITY_CHECK"),
+            PacketType::ConnectivityResponse => write!(f, "CONNECTIVITY_RESPONSE"),
+            PacketType::Keepalive => write!(f, "KEEPALIVE"),
         }
     }
 }
