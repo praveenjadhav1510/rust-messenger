@@ -177,6 +177,55 @@ impl MessageListener {
                     );
                 }
             }
+            PacketType::ConnectivityCheck => {
+                let current_session = crate::session::manager::get_current_session()?;
+                let resp = Packet {
+                    version: 1,
+                    packet_type: PacketType::ConnectivityResponse,
+                    message_id: Uuid::new_v4(),
+                    sender: current_session.username.clone(),
+                    recipient: packet.sender.clone(),
+                    timestamp: Utc::now(),
+                    nonce: Uuid::new_v4().to_string(),
+                    encrypted_payload: String::new(),
+                    signature: "connectivity-response".to_string(),
+                };
+                if let Ok(resp_payload) = resp.encode() {
+                    let _ = socket.send_to(resp_payload.as_bytes(), from_addr).await;
+                }
+            }
+            PacketType::PunchProbe => {
+                #[derive(serde::Deserialize)]
+                #[serde(rename_all = "camelCase")]
+                struct ProbePayload {
+                    #[serde(rename = "sessionId")]
+                    session_id: String,
+                }
+                if let Ok(p) = serde_json::from_str::<ProbePayload>(&packet.encrypted_payload) {
+                    let current_session = crate::session::manager::get_current_session()?;
+                    if let Ok(ack) = crate::punch::probe::build_ack_packet(&p.session_id, &current_session.username, &packet.sender) {
+                        if let Ok(encoded) = ack.encode() {
+                            let _ = socket.send_to(encoded.as_bytes(), from_addr).await;
+                        }
+                    }
+                }
+            }
+            PacketType::PunchAck => {
+                #[derive(serde::Deserialize)]
+                #[serde(rename_all = "camelCase")]
+                struct AckPayload {
+                    #[serde(rename = "sessionId")]
+                    session_id: String,
+                }
+                if let Ok(_p) = serde_json::from_str::<AckPayload>(&packet.encrypted_payload) {
+                    if let Ok(mut sessions) = load_punch_sessions() {
+                        if let Some(session) = sessions.iter_mut().find(|s| s.peer.eq_ignore_ascii_case(&packet.sender)) {
+                            session.state = crate::punch::state::PunchState::Established;
+                            let _ = crate::punch::session::save_punch_sessions(&sessions);
+                        }
+                    }
+                }
+            }
             _ => {}
         }
         Ok(())

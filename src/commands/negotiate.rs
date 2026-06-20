@@ -25,21 +25,40 @@ pub async fn exec(username: &str) -> Result<()> {
         ));
     }
 
-    // 3. Select best candidate pair
-    let best_pair = CandidateSelector::select_best_pair(&local_candidates, &remote_candidates)?;
+    // 3. Require successful ICE check results
+    let ice_sessions = crate::ice::connectivity::load_ice_sessions()?;
+    let ice_session = ice_sessions
+        .iter()
+        .find(|s| s.peer.eq_ignore_ascii_case(username))
+        .ok_or_else(|| anyhow!("No successful ICE check found for peer '{}'. Run 'rust-messenger ice-check {}' first.", username, username))?;
+    
+    let best_pair = ice_session.selected_pair.clone();
 
-    // 4. Generate offer
-    let offer = HandshakeManager::create_offer(username, local_candidates)?;
+    // 4. Resolve presence session IDs to derive a deterministic, shared session ID
+    let local_presence = crate::session::manager::get_current_session()?;
+    let remote_presence = crate::presence::manager::get_user_status(username).await?;
+    let remote_session_id = remote_presence.session_id.ok_or_else(|| {
+        anyhow!("Peer '{}' is offline or has no active session.", username)
+    })?;
 
-    // 5. Simulate acceptance
-    let answer = HandshakeManager::accept_offer(offer.clone(), best_pair.remote.clone())?;
-    HandshakeManager::complete_handshake(&offer.offer_id, answer)?;
+    let mut presence_ids = vec![local_presence.session_id.clone(), remote_session_id];
+    presence_ids.sort();
+    let combined = presence_ids.join("_");
+    
+    use sha2::{Digest, Sha256};
+    let mut hasher = Sha256::new();
+    hasher.update(combined.as_bytes());
+    let negotiated_session_id = hasher
+        .finalize()
+        .iter()
+        .map(|b| format!("{:02x}", b))
+        .collect::<String>();
 
-    // 6. Create peer session
+    // 5. Create peer session using the ICE transport and the deterministic session ID
     let peer_session = PeerSession::new(
         username.to_string(),
-        offer.session_id,
-        crate::connection::models::TransportType::Mock,
+        negotiated_session_id,
+        crate::connection::models::TransportType::Ice,
     );
     let mut sessions = load_sessions()?;
     sessions.retain(|s| !s.username.eq_ignore_ascii_case(username));

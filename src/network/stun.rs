@@ -5,14 +5,23 @@ use stunclient::StunClient;
 pub async fn discover_public_endpoint(stun_server: &str) -> Result<(String, u16)> {
     let stun_server_str = stun_server.to_string();
     tokio::task::spawn_blocking(move || {
-        let socket = UdpSocket::bind("0.0.0.0:0")
-            .map_err(|e| anyhow!("Failed to bind local UDP socket: {}", e))?;
+        let socket = match UdpSocket::bind("0.0.0.0:5000") {
+            Ok(s) => s,
+            Err(_) => UdpSocket::bind("0.0.0.0:0")
+                .map_err(|e| anyhow!("Failed to bind local UDP socket: {}", e))?,
+        };
+
+        socket.set_read_timeout(Some(std::time::Duration::from_secs(3)))
+            .map_err(|e| anyhow!("Failed to set socket read timeout: {}", e))?;
+        socket.set_write_timeout(Some(std::time::Duration::from_secs(3)))
+            .map_err(|e| anyhow!("Failed to set socket write timeout: {}", e))?;
 
         let server_addr = stun_server_str
             .to_socket_addrs()
             .map_err(|e| anyhow!("Failed to resolve STUN server address: {}", e))?
-            .next()
-            .ok_or_else(|| anyhow!("STUN server address resolved to empty list."))?;
+            .into_iter()
+            .find(|addr| addr.is_ipv4())
+            .ok_or_else(|| anyhow!("STUN server address resolved to no IPv4 addresses."))?;
 
         let client = StunClient::new(server_addr);
         let public_addr = client

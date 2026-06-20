@@ -35,19 +35,13 @@ impl HolePunchCoordinator {
                 5002
             }
         } else {
-            selected_pair.local.port
+            5000
         };
 
-        let local_addr = format!("{}:{}", selected_pair.local.address, local_port);
+        let local_addr = format!("0.0.0.0:{}", local_port);
         let socket = match UdpSocket::bind(&local_addr).await {
             Ok(s) => s,
-            Err(_) => {
-                if selected_pair.local.address == "127.0.0.1" {
-                    UdpSocket::bind("127.0.0.1:0").await?
-                } else {
-                    UdpSocket::bind("0.0.0.0:0").await?
-                }
-            }
+            Err(_) => UdpSocket::bind("0.0.0.0:0").await?,
         };
 
         Ok(Self {

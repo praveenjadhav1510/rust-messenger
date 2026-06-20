@@ -15,15 +15,7 @@ pub struct PeerDiscoveryManager;
 
 impl PeerDiscoveryManager {
     pub async fn discover_peer(username: &str) -> Result<DiscoveredPeer> {
-        let presence = match get_user_status(username).await {
-            Ok(p) => p,
-            Err(_) => crate::presence::models::PresenceInfo {
-                username: username.to_string(),
-                online: true,
-                last_seen: Some(chrono::Utc::now().to_rfc3339()),
-                client_version: Some("0.5.0".to_string()),
-            },
-        };
+        let presence = get_user_status(username).await?;
 
         let caps = PeerCapabilities::default();
         let cands = fetch_remote_candidates(username).await?;

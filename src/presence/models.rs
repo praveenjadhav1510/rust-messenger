@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 pub struct PresenceInfo {
     pub username: String,
     pub online: bool,
+    #[serde(rename = "sessionId")]
+    pub session_id: Option<String>,
     #[serde(rename = "lastSeen")]
     pub last_seen: Option<String>,
     #[serde(rename = "clientVersion")]

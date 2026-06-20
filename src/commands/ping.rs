@@ -19,7 +19,7 @@ pub async fn exec(username: &str) -> Result<()> {
 
     // 3. Initialize transport manager and transport
     let mut transport_manager = TransportManager::new();
-    let transport = create_transport(peer.transport)?;
+    let transport = create_transport(peer.transport, username)?;
     transport_manager.register_transport(transport);
 
     // 4. Construct PING packet

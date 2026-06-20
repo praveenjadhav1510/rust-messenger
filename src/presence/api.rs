@@ -17,6 +17,7 @@ pub async fn fetch_presence(username: &str) -> Result<PresenceInfo> {
     Ok(PresenceInfo {
         username: response.username,
         online: response.online,
+        session_id: response.session_id,
         last_seen: response.last_seen,
         client_version: response.client_version,
     })

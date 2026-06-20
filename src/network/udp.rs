@@ -24,7 +24,7 @@ impl UdpTransport {
     pub fn bind(&mut self, port: u16) -> Result<()> {
         let handle = Handle::current();
         let socket =
-            handle.block_on(async { UdpSocket::bind(format!("127.0.0.1:{}", port)).await })?;
+            handle.block_on(async { UdpSocket::bind(format!("0.0.0.0:{}", port)).await })?;
         self.socket = Some(Arc::new(socket));
         self.local_port = port;
         Ok(())
