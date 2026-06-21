@@ -14,9 +14,9 @@ pub async fn publish_candidates(
     let resp = client
         .publish_candidates(username, session_id, candidates)
         .await
-        .map_err(|_| anyhow!("Registry unavailable."))?;
+        .map_err(|e| anyhow!("Registry unavailable: {}", e))?;
     if !resp.success {
-        return Err(anyhow!("Registry unavailable."));
+        return Err(anyhow!("Registry rejected publish candidates."));
     }
     Ok(())
 }
