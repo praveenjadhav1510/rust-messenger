@@ -16,8 +16,10 @@ pub async fn validate_pair(
 ) -> Result<IceConnectionState> {
     pair.state = IceConnectionState::Checking;
 
-    let is_loopback = pair.remote.address == "127.0.0.1" || pair.remote.address == "localhost"
-        || pair.local.address == "127.0.0.1" || pair.local.address == "localhost";
+    let is_loopback = pair.remote.address == "127.0.0.1"
+        || pair.remote.address == "localhost"
+        || pair.local.address == "127.0.0.1"
+        || pair.local.address == "localhost";
 
     let bind_port = if is_loopback {
         if sender_name.to_lowercase() < recipient_name.to_lowercase() {

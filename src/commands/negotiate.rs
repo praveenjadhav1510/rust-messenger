@@ -31,20 +31,20 @@ pub async fn exec(username: &str) -> Result<()> {
         .iter()
         .find(|s| s.peer.eq_ignore_ascii_case(username))
         .ok_or_else(|| anyhow!("No successful ICE check found for peer '{}'. Run 'rust-messenger ice-check {}' first.", username, username))?;
-    
+
     let best_pair = ice_session.selected_pair.clone();
 
     // 4. Resolve presence session IDs to derive a deterministic, shared session ID
     let local_presence = crate::session::manager::get_current_session()?;
     let remote_presence = crate::presence::manager::get_user_status(username).await?;
-    let remote_session_id = remote_presence.session_id.ok_or_else(|| {
-        anyhow!("Peer '{}' is offline or has no active session.", username)
-    })?;
+    let remote_session_id = remote_presence
+        .session_id
+        .ok_or_else(|| anyhow!("Peer '{}' is offline or has no active session.", username))?;
 
     let mut presence_ids = vec![local_presence.session_id.clone(), remote_session_id];
     presence_ids.sort();
     let combined = presence_ids.join("_");
-    
+
     use sha2::{Digest, Sha256};
     let mut hasher = Sha256::new();
     hasher.update(combined.as_bytes());

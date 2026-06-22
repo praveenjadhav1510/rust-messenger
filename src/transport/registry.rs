@@ -3,7 +3,10 @@ use crate::transport::mock::MockTransport;
 use crate::transport::r#trait::Transport;
 use anyhow::{Result, anyhow};
 
-pub fn create_transport(transport_type: TransportType, peer_username: &str) -> Result<Box<dyn Transport + Send + Sync>> {
+pub fn create_transport(
+    transport_type: TransportType,
+    peer_username: &str,
+) -> Result<Box<dyn Transport + Send + Sync>> {
     match transport_type {
         TransportType::Mock => {
             let mut mock = MockTransport::new();
@@ -20,7 +23,10 @@ pub fn create_transport(transport_type: TransportType, peer_username: &str) -> R
                 .ok_or_else(|| anyhow!("No established punch session found for peer '{}'. Run 'rust-messenger punch {}' first.", peer_username, peer_username))?;
 
             if punch_session.state != crate::punch::state::PunchState::Established {
-                return Err(anyhow!("Punch session for peer '{}' is not established.", peer_username));
+                return Err(anyhow!(
+                    "Punch session for peer '{}' is not established.",
+                    peer_username
+                ));
             }
 
             let local_session = crate::session::manager::get_current_session()?;
@@ -36,10 +42,7 @@ pub fn create_transport(transport_type: TransportType, peer_username: &str) -> R
                     (5002, 5001)
                 }
             } else {
-                (
-                    5000,
-                    punch_session.selected_pair.remote.port,
-                )
+                (5000, punch_session.selected_pair.remote.port)
             };
 
             let remote_addr: std::net::SocketAddr = format!(
@@ -48,7 +51,8 @@ pub fn create_transport(transport_type: TransportType, peer_username: &str) -> R
             )
             .parse()?;
 
-            let mut transport = crate::network::udp::UdpTransport::new(local_port, Some(remote_addr));
+            let mut transport =
+                crate::network::udp::UdpTransport::new(local_port, Some(remote_addr));
             transport.connect()?;
             Ok(Box::new(transport))
         }

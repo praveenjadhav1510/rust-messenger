@@ -51,7 +51,7 @@ impl ConnectionManager {
         // 4. Create peer session.
         let session_id = uuid::Uuid::new_v4().to_string();
         let peer_session =
-            PeerSession::new(contact.username.clone(), session_id, TransportType::Mock);
+            PeerSession::new(contact.username.clone(), session_id, TransportType::Ice);
 
         // Save peer session.
         let mut sessions = load_sessions()?;

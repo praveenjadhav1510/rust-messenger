@@ -203,7 +203,11 @@ impl MessageListener {
                 }
                 if let Ok(p) = serde_json::from_str::<ProbePayload>(&packet.encrypted_payload) {
                     let current_session = crate::session::manager::get_current_session()?;
-                    if let Ok(ack) = crate::punch::probe::build_ack_packet(&p.session_id, &current_session.username, &packet.sender) {
+                    if let Ok(ack) = crate::punch::probe::build_ack_packet(
+                        &p.session_id,
+                        &current_session.username,
+                        &packet.sender,
+                    ) {
                         if let Ok(encoded) = ack.encode() {
                             let _ = socket.send_to(encoded.as_bytes(), from_addr).await;
                         }
@@ -219,7 +223,10 @@ impl MessageListener {
                 }
                 if let Ok(_p) = serde_json::from_str::<AckPayload>(&packet.encrypted_payload) {
                     if let Ok(mut sessions) = load_punch_sessions() {
-                        if let Some(session) = sessions.iter_mut().find(|s| s.peer.eq_ignore_ascii_case(&packet.sender)) {
+                        if let Some(session) = sessions
+                            .iter_mut()
+                            .find(|s| s.peer.eq_ignore_ascii_case(&packet.sender))
+                        {
                             session.state = crate::punch::state::PunchState::Established;
                             let _ = crate::punch::session::save_punch_sessions(&sessions);
                         }

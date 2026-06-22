@@ -11,9 +11,11 @@ pub async fn discover_public_endpoint(stun_server: &str) -> Result<(String, u16)
                 .map_err(|e| anyhow!("Failed to bind local UDP socket: {}", e))?,
         };
 
-        socket.set_read_timeout(Some(std::time::Duration::from_secs(3)))
+        socket
+            .set_read_timeout(Some(std::time::Duration::from_secs(3)))
             .map_err(|e| anyhow!("Failed to set socket read timeout: {}", e))?;
-        socket.set_write_timeout(Some(std::time::Duration::from_secs(3)))
+        socket
+            .set_write_timeout(Some(std::time::Duration::from_secs(3)))
             .map_err(|e| anyhow!("Failed to set socket write timeout: {}", e))?;
 
         let server_addr = stun_server_str
