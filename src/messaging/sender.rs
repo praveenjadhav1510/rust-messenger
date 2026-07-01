@@ -105,17 +105,14 @@ impl MessageSender {
             )
         };
 
-        let local_addr = format!(
-            "{}:{}",
-            punch_session.selected_pair.local.address, local_port
-        );
         let remote_addr: SocketAddr = format!(
             "{}:{}",
             punch_session.selected_pair.remote.address, remote_port
         )
         .parse()?;
 
-        let socket = match UdpSocket::bind(local_addr).await {
+        let bind_addr = format!("0.0.0.0:{}", local_port);
+        let socket = match UdpSocket::bind(&bind_addr).await {
             Ok(s) => s,
             Err(_) => UdpSocket::bind("0.0.0.0:0").await?,
         };
@@ -233,17 +230,14 @@ impl MessageSender {
             )
         };
 
-        let local_addr = format!(
-            "{}:{}",
-            punch_session.selected_pair.local.address, local_port
-        );
         let remote_addr: SocketAddr = format!(
             "{}:{}",
             punch_session.selected_pair.remote.address, remote_port
         )
         .parse()?;
 
-        let socket = match UdpSocket::bind(local_addr).await {
+        let bind_addr = format!("0.0.0.0:{}", local_port);
+        let socket = match UdpSocket::bind(&bind_addr).await {
             Ok(s) => s,
             Err(_) => UdpSocket::bind("0.0.0.0:0").await?,
         };

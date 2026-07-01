@@ -1,13 +1,11 @@
 use crate::protocol::packet::Packet;
 use crate::transport::r#trait::Transport;
 use anyhow::{Result, anyhow};
-use std::net::SocketAddr;
-use std::sync::Arc;
-use tokio::net::UdpSocket;
-use tokio::runtime::Handle;
+use std::net::{SocketAddr, UdpSocket};
+use std::time::Duration;
 
 pub struct UdpTransport {
-    socket: Option<Arc<UdpSocket>>,
+    socket: Option<UdpSocket>,
     local_port: u16,
     remote_addr: Option<SocketAddr>,
 }
@@ -22,10 +20,9 @@ impl UdpTransport {
     }
 
     pub fn bind(&mut self, port: u16) -> Result<()> {
-        let handle = Handle::current();
-        let socket =
-            handle.block_on(async { UdpSocket::bind(format!("0.0.0.0:{}", port)).await })?;
-        self.socket = Some(Arc::new(socket));
+        let socket = UdpSocket::bind(format!("0.0.0.0:{}", port))?;
+        socket.set_read_timeout(Some(Duration::from_secs(5)))?;
+        self.socket = Some(socket);
         self.local_port = port;
         Ok(())
     }
@@ -36,8 +33,7 @@ impl UdpTransport {
             .as_ref()
             .ok_or_else(|| anyhow!("Socket not bound."))?;
         let payload = packet.encode()?;
-        let handle = Handle::current();
-        let _sent = handle.block_on(async { socket.send_to(payload.as_bytes(), addr).await })?;
+        socket.send_to(payload.as_bytes(), addr)?;
         Ok(())
     }
 
@@ -47,8 +43,7 @@ impl UdpTransport {
             .as_ref()
             .ok_or_else(|| anyhow!("Socket not bound."))?;
         let mut buf = vec![0u8; 65535];
-        let handle = Handle::current();
-        let (len, addr) = handle.block_on(async { socket.recv_from(&mut buf).await })?;
+        let (len, addr) = socket.recv_from(&mut buf)?;
         let payload_str = std::str::from_utf8(&buf[..len])?;
         let packet = Packet::decode(payload_str)?;
         Ok((packet, addr))

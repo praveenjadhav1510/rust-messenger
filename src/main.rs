@@ -373,7 +373,7 @@ async fn main() -> Result<()> {
                 commands::message::exec_send(&username, &text)?;
             }
             MessageCommands::History { username } => {
-                commands::message::exec_history(&username)?;
+                commands::message::exec_history(&username).await?;
             }
             MessageCommands::List => {
                 commands::message::exec_list()?;

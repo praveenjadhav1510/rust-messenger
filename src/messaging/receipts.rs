@@ -8,7 +8,7 @@ use std::net::SocketAddr;
 use tokio::net::UdpSocket;
 use uuid::Uuid;
 
-pub fn mark_incoming_messages_read(username: &str) -> Result<()> {
+pub async fn mark_incoming_messages_read(username: &str) -> Result<()> {
     let mut messages = load_messages(username)?;
     let mut updated = false;
     for msg in &mut messages {
@@ -17,10 +17,7 @@ pub fn mark_incoming_messages_read(username: &str) -> Result<()> {
             updated = true;
 
             let msg_id = msg.id;
-            let peer = username.to_string();
-            tokio::spawn(async move {
-                let _ = send_read_receipt_packet(&peer, msg_id).await;
-            });
+            let _ = send_read_receipt_packet(username, msg_id).await;
         }
     }
     if updated {
@@ -68,17 +65,14 @@ async fn send_read_receipt_packet(peer: &str, message_id: Uuid) -> Result<()> {
         )
     };
 
-    let local_addr = format!(
-        "{}:{}",
-        punch_session.selected_pair.local.address, local_port
-    );
     let remote_addr: SocketAddr = format!(
         "{}:{}",
         punch_session.selected_pair.remote.address, remote_port
     )
     .parse()?;
 
-    let socket = match UdpSocket::bind(local_addr).await {
+    let bind_addr = format!("0.0.0.0:{}", local_port);
+    let socket = match UdpSocket::bind(&bind_addr).await {
         Ok(s) => s,
         Err(_) => UdpSocket::bind("0.0.0.0:0").await?,
     };

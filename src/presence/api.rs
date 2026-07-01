@@ -29,7 +29,7 @@ pub async fn announce_online(username: &str, session_id: &str, client_version: &
     let response = client
         .send_heartbeat(username, session_id, client_version)
         .await
-        .map_err(|_| anyhow!("Registry unavailable."))?;
+        .map_err(|e| anyhow!("Registry unavailable: {}", e))?;
     if !response.success {
         return Err(anyhow!("Registry unavailable."));
     }

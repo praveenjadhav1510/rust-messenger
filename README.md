@@ -346,3 +346,60 @@ Phase 1: Identity & Registry Client
 
 Distributed under the MIT License.
 
+
+## End-to-End Testing
+
+### Platforms Tested
+- **Windows**: Windows 11 host environment (Zoro)
+- **WSL Ubuntu**: Ubuntu 22.04 LTS running on WSL 2 (Luffy)
+
+### Registry URL
+- `https://user-registry-ten.vercel.app`
+
+### Testing Date
+- July 1, 2026
+
+### Protocol Tested
+- Full 24-stage E2E protocol flow from profile initialization and registry registration, through concurrent ICE candidate verification, deterministic connection negotiation, symmetric key secure session derivation, concurrent UDP hole punching, direct encrypted message delivery with Message ACK, read receipts, peer disconnection/reconnection, and key rotation.
+
+### Stages Completed
+- Stages 1 through 24 (all completed successfully with real networking transport).
+
+### Networking Stack
+- Standard synchronous/asynchronous UDP sockets using `std::net::UdpSocket` and `tokio::net::UdpSocket`.
+
+### Encryption
+- Symmetric: ChaCha20-Poly1305 (via `chacha20poly1305` crate)
+- Ephemeral Diffie-Hellman key exchange: X25519 (via `x25519-dalek` crate)
+- Hash function: SHA-256 (via `sha2` crate)
+
+### Files Tested
+- [main.rs](file:///home/praveenjadhav/rust-messenger/src/main.rs)
+- [sender.rs](file:///home/praveenjadhav/rust-messenger/src/messaging/sender.rs)
+- [receipts.rs](file:///home/praveenjadhav/rust-messenger/src/messaging/receipts.rs)
+- [message.rs](file:///home/praveenjadhav/rust-messenger/src/commands/message.rs)
+- [udp.rs](file:///home/praveenjadhav/rust-messenger/src/network/udp.rs)
+- [interfaces.rs](file:///home/praveenjadhav/rust-messenger/src/network/interfaces.rs)
+
+### Features Verified
+- Multi-platform E2E network connectivity.
+- Dynamic ICE candidate gathering and registry-mediated discovery.
+- Simultaneous UDP hole punching.
+- E2E encrypted message transmission with delivery validation.
+- Interactive E2E read receipt synchronization.
+- Identity key rotation via Vercel registry account recovery.
+
+### Known Limitations
+- Candidate publication on the Vercel registry expires in 60 seconds; connection negotiation or ICE verification must happen promptly after publishing.
+
+### Bugs Found & Fixed
+1. **Nested Tokio Runtime Panic**: `UdpTransport` methods called `Handle::current().block_on` which caused panics when called from within the tokio runtime context.
+   - *Fix*: Switched `UdpTransport` from `tokio::net::UdpSocket` to standard synchronous `std::net::UdpSocket` since its trait methods are synchronous.
+2. **Local Address Binding Bug**: Sockets were bound to candidate-specific local IPs (like loopback or local private IPs). On virtualized systems (WSL), outgoing replies were sent to the host gateway IP, causing incoming packets to be dropped.
+   - *Fix*: Bound all messaging sockets to wildcard IP `0.0.0.0` with the candidate's port.
+3. **Premature CLI Exit**: In `exec_history`, read receipts were sent asynchronously in a background tokio thread (`tokio::spawn`), which was killed immediately when the CLI process exited.
+   - *Fix*: Made `exec_history` and `mark_incoming_messages_read` asynchronous and awaited the UDP read receipt transmission.
+
+### Final Result
+- **PASS**: The Rust Messenger E2E networking pipeline is production-ready, fully verified, and functionally validated.
+

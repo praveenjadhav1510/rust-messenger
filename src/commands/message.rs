@@ -57,12 +57,12 @@ pub fn exec_send(username: &str, text: &str) -> Result<()> {
     Ok(())
 }
 
-pub fn exec_history(username: &str) -> Result<()> {
+pub async fn exec_history(username: &str) -> Result<()> {
     // Verify contact exists
     let contact = get_contact(username)?;
 
     // Mark unread messages read when user opens message history
-    let _ = crate::messaging::receipts::mark_incoming_messages_read(&contact.username);
+    let _ = crate::messaging::receipts::mark_incoming_messages_read(&contact.username).await;
 
     let messages = crate::chat::storage::load_messages(&contact.username)?;
     let sender_label = capitalize(&contact.username);
