@@ -138,6 +138,7 @@ impl HolePunchCoordinator {
                             let ack = build_ack_packet(&self.session_id, &self.sender, &self.peer)?;
                             let encoded = ack.encode()?;
                             let _ = self.socket.send_to(encoded.as_bytes(), from_addr).await;
+                            return Ok(true);
                         }
                     }
                 }

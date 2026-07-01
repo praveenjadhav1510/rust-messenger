@@ -94,6 +94,8 @@ pub async fn validate_pair(
                         if let Ok(resp_payload) = resp.encode() {
                             let _ = socket.send_to(resp_payload.as_bytes(), from_addr).await;
                         }
+                        pair.state = IceConnectionState::Connected;
+                        return Ok(IceConnectionState::Connected);
                     }
                 }
             }

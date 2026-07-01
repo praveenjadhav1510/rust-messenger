@@ -24,10 +24,11 @@ pub fn get_listener_port() -> Result<u16> {
         .find(|s| s.state == crate::punch::state::PunchState::Established);
 
     if let Some(session) = established {
-        let is_loopback = (session.selected_pair.local.address == "127.0.0.1"
-            || session.selected_pair.local.address == "localhost")
-            && (session.selected_pair.remote.address == "127.0.0.1"
-                || session.selected_pair.remote.address == "localhost");
+        let is_loopback = session.selected_pair.local.address == session.selected_pair.remote.address
+            || session.selected_pair.local.address == "127.0.0.1"
+            || session.selected_pair.local.address == "localhost"
+            || session.selected_pair.remote.address == "127.0.0.1"
+            || session.selected_pair.remote.address == "localhost";
 
         if is_loopback {
             if current_session.username.to_lowercase() < session.peer.to_lowercase() {

@@ -30,10 +30,11 @@ pub fn create_transport(
             }
 
             let local_session = crate::session::manager::get_current_session()?;
-            let is_loopback = (punch_session.selected_pair.local.address == "127.0.0.1"
-                || punch_session.selected_pair.local.address == "localhost")
-                && (punch_session.selected_pair.remote.address == "127.0.0.1"
-                    || punch_session.selected_pair.remote.address == "localhost");
+            let is_loopback = punch_session.selected_pair.local.address == punch_session.selected_pair.remote.address
+                || punch_session.selected_pair.local.address == "127.0.0.1"
+                || punch_session.selected_pair.local.address == "localhost"
+                || punch_session.selected_pair.remote.address == "127.0.0.1"
+                || punch_session.selected_pair.remote.address == "localhost";
 
             let (local_port, remote_port) = if is_loopback {
                 if local_session.username.to_lowercase() < peer_username.to_lowercase() {
