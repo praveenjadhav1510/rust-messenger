@@ -33,8 +33,8 @@ pub fn start_session() -> Result<Session> {
         .ok_or_else(|| anyhow!("No registered identity found."))?;
 
     let session = match load_session() {
-        Ok(s) if s.online => {
-            // If session already online: reuse it.
+        Ok(s) if s.online && s.username == *username => {
+            // Reuse existing online session only if username matches current profile.
             s
         }
         _ => {

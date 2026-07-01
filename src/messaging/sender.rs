@@ -8,9 +8,25 @@ use crate::secure::session::load_secure_sessions;
 use anyhow::{Result, anyhow};
 use base64::{Engine, prelude::BASE64_STANDARD};
 use chrono::Utc;
+use socket2::{Domain, Protocol, Socket, Type};
 use std::net::SocketAddr;
 use tokio::net::UdpSocket;
 use uuid::Uuid;
+
+/// Bind a UDP socket with SO_REUSEPORT + SO_REUSEADDR so the sender can share
+/// the same port that the listener process is already holding.  This is
+/// essential for NAT traversal: the NAT entry was punched on a specific port
+/// and a new socket on a different ephemeral port would have no mapping.
+fn bind_reusable_udp(port: u16) -> std::io::Result<std::net::UdpSocket> {
+    let socket = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))?;
+    socket.set_reuse_address(true)?;
+    #[cfg(unix)]
+    socket.set_reuse_port(true)?;
+    socket.set_nonblocking(true)?;
+    let addr: std::net::SocketAddr = format!("0.0.0.0:{}", port).parse().unwrap();
+    socket.bind(&addr.into())?;
+    Ok(socket.into())
+}
 
 pub struct MessageSender;
 
@@ -111,11 +127,12 @@ impl MessageSender {
         )
         .parse()?;
 
-        let bind_addr = format!("0.0.0.0:{}", local_port);
-        let socket = match UdpSocket::bind(&bind_addr).await {
-            Ok(s) => s,
-            Err(_) => UdpSocket::bind("0.0.0.0:0").await?,
-        };
+        // Try to bind with SO_REUSEPORT so we share the NAT-punched port
+        // with any running listener.  Fall back to an ephemeral port only
+        // when reuseport itself fails (very unusual).
+        let std_socket = bind_reusable_udp(local_port)
+            .or_else(|_| bind_reusable_udp(0))?;
+        let socket = UdpSocket::from_std(std_socket)?;
 
         let ack_received =
             DeliveryManager::send_with_retry(&socket, remote_addr, &packet, msg.id).await?;
@@ -236,11 +253,10 @@ impl MessageSender {
         )
         .parse()?;
 
-        let bind_addr = format!("0.0.0.0:{}", local_port);
-        let socket = match UdpSocket::bind(&bind_addr).await {
-            Ok(s) => s,
-            Err(_) => UdpSocket::bind("0.0.0.0:0").await?,
-        };
+        // Same reusable-port binding as send_message.
+        let std_socket = bind_reusable_udp(local_port)
+            .or_else(|_| bind_reusable_udp(0))?;
+        let socket = UdpSocket::from_std(std_socket)?;
 
         let ack_received =
             DeliveryManager::send_with_retry(&socket, remote_addr, &packet, message_id).await?;

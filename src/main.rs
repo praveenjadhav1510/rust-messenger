@@ -22,6 +22,7 @@ mod secure;
 mod session;
 mod storage;
 mod transport;
+mod tui;
 
 #[derive(Parser)]
 #[command(name = "rust-messenger")]
@@ -291,6 +292,8 @@ enum Commands {
         #[command(subcommand)]
         command: DevCommands,
     },
+    /// Launch the interactive terminal user interface
+    Tui,
 }
 
 #[tokio::main]
@@ -464,6 +467,9 @@ async fn main() -> Result<()> {
                 commands::dev::exec_inject(&username, &text)?;
             }
         },
+        Commands::Tui => {
+            tui::app::launch().await?;
+        }
     }
 
     Ok(())
