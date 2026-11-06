@@ -127,6 +127,27 @@ quits unless a chat composer is active.
 
 ---
 
+## Chatting with a Friend
+
+For a real two-way conversation between two machines, follow the
+[two-way chat runbook](docs/guides/two-way-chat.md). The companion script drives
+the whole setup — presence, candidate publication, contacts, ICE, negotiation,
+secure-session bootstrap and hole punching — pausing twice so both people run
+the synchronized ICE check and UDP punch at the same time:
+
+```bash
+# Run on BOTH machines, passing the other person's username
+./scripts/two-peer-chat.sh <friend-username>
+```
+
+Use `--loopback` to rehearse both peers on a single machine, `--no-listener` if
+you will use the TUI's `F7` listener instead, and `--sync-session` if a stale
+heartbeat is holding your username online. When both sides print
+`Ready to chat`, exchange messages with `send` and read them with
+`message history` (or use the TUI Chat screen).
+
+---
+
 ## Local Directory Structure
 
 All configuration, credentials, and state are stored in the user's home directory under `~/.rust-messenger/`:
