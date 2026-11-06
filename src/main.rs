@@ -1,6 +1,7 @@
 #![allow(dead_code, unused_imports)]
 use anyhow::Result;
-use clap::{Parser, Subcommand};
+use clap::{CommandFactory, Parser, Subcommand};
+use std::io::IsTerminal;
 
 mod candidates;
 mod chat;
@@ -29,7 +30,7 @@ mod tui;
 #[command(about = "A privacy-first messaging identity client", long_about = None)]
 struct Cli {
     #[command(subcommand)]
-    command: Commands,
+    command: Option<Commands>,
 }
 
 #[derive(Subcommand)]
@@ -300,7 +301,19 @@ enum Commands {
 async fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    match cli.command {
+    let Some(command) = cli.command else {
+        // No subcommand: launch the TUI on a real terminal, otherwise print help
+        // so scripts and pipes keep their usual behaviour.
+        if std::io::stdout().is_terminal() && std::io::stdin().is_terminal() {
+            tui::app::launch().await?;
+        } else {
+            Cli::command().print_help()?;
+            println!();
+        }
+        return Ok(());
+    };
+
+    match command {
         Commands::Init { force } => {
             commands::init::exec(force)?;
         }

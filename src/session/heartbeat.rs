@@ -55,9 +55,7 @@ impl HeartbeatService {
             loop {
                 tokio::select! {
                     _ = interval.tick() => {
-                        if let Err(e) = Self::tick_client(&client, &username, &session_id, &client_version).await {
-                            eprintln!("Heartbeat error: {}", e);
-                        }
+                        let _ = Self::tick_client(&client, &username, &session_id, &client_version).await;
                     }
                     _ = &mut stop_rx => {
                         break;

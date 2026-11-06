@@ -1,369 +1,781 @@
+use crate::candidates::manager::CandidateManager;
+use crate::candidates::publication::CandidatePublication;
+use crate::chat::conversation::list_conversations;
 use crate::chat::models::{Direction, Message, MessageStatus};
+use crate::chat::storage::load_messages;
+use crate::config::profile::Profile;
+use crate::connection::manager::load_sessions;
+use crate::connection::models::PeerSession;
+use crate::contacts::manager::load_contacts;
 use crate::contacts::models::{Contact, TrustLevel};
-use crate::punch::session::PunchSession;
+use crate::ice::connectivity::{IceSession, load_ice_sessions};
+use crate::messaging::manager::MessageManager;
+use crate::peer::capabilities::{PeerCapabilities, load_local_capabilities};
+use crate::protocol::requests::{MessageRequest, load_requests};
+use crate::punch::session::{PunchSession, load_punch_sessions};
+use crate::punch::state::PunchState;
+use crate::registry::models::{SearchResult, UserLookupResponse};
+use crate::secure::session::{SecureSession, load_secure_sessions};
+use crate::session::manager::is_online;
+use crate::storage::filesystem::{get_storage_dir, read_profile};
+use crate::tui::actions::{Command, FormKind, FormState, RunRequest};
 
-// ── Color Palette ──────────────────────────────────────────────────────────
-// Background:  #1e1e1e
-// Cream:       #F2D2BD  (soft warm highlight)
-// Burnt:       #C04000  (accent / active)
-// Wheat:       #F5DEB3  (secondary text)
-// Dark red:    #8B0000  (error / blocked)
-// Linen:       #EADDCA  (primary text)
-// Red accent:  #FF4433  (status dot / unread badge)
+// ── Palette ────────────────────────────────────────────────────────────────
+pub const BG: ratatui::style::Color = ratatui::style::Color::Rgb(20, 20, 22);
+pub const PANEL_BG: ratatui::style::Color = ratatui::style::Color::Rgb(26, 26, 29);
+pub const PANEL_ALT: ratatui::style::Color = ratatui::style::Color::Rgb(32, 31, 34);
+pub const BORDER: ratatui::style::Color = ratatui::style::Color::Rgb(70, 62, 58);
+pub const CREAM: ratatui::style::Color = ratatui::style::Color::Rgb(242, 210, 189);
+pub const LINEN: ratatui::style::Color = ratatui::style::Color::Rgb(234, 221, 202);
+pub const WHEAT: ratatui::style::Color = ratatui::style::Color::Rgb(245, 222, 179);
+pub const BURNT: ratatui::style::Color = ratatui::style::Color::Rgb(220, 104, 46);
+pub const DARK_RED: ratatui::style::Color = ratatui::style::Color::Rgb(170, 40, 40);
+pub const RED_ACCENT: ratatui::style::Color = ratatui::style::Color::Rgb(255, 92, 72);
+pub const GREEN: ratatui::style::Color = ratatui::style::Color::Rgb(122, 196, 140);
+pub const DIM: ratatui::style::Color = ratatui::style::Color::Rgb(96, 88, 82);
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Screen {
     Dashboard,
     Chat,
-    SetupWizard,
+    Contacts,
+    Network,
+    Registry,
+    Messages,
+    Settings,
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum SetupStep {
-    Init,
-    Register,
-    Online,
-    PublishCandidates,
-    AddContact,
-    VerifyContact,
-    Discover,
-    Connect,
-    IceCheck,
-    Negotiate,
-    SecureSession,
-    Punch,
-    Ready,
-}
+impl Screen {
+    pub const ALL: [Screen; 7] = [
+        Screen::Dashboard,
+        Screen::Chat,
+        Screen::Contacts,
+        Screen::Network,
+        Screen::Registry,
+        Screen::Messages,
+        Screen::Settings,
+    ];
 
-impl SetupStep {
-    pub fn all() -> Vec<SetupStep> {
-        vec![
-            SetupStep::Init,
-            SetupStep::Register,
-            SetupStep::Online,
-            SetupStep::PublishCandidates,
-            SetupStep::AddContact,
-            SetupStep::VerifyContact,
-            SetupStep::Discover,
-            SetupStep::Connect,
-            SetupStep::IceCheck,
-            SetupStep::Negotiate,
-            SetupStep::SecureSession,
-            SetupStep::Punch,
-            SetupStep::Ready,
-        ]
-    }
-
-    pub fn label(&self) -> &'static str {
+    pub fn title(self) -> &'static str {
         match self {
-            SetupStep::Init => "init",
-            SetupStep::Register => "register <username>",
-            SetupStep::Online => "online",
-            SetupStep::PublishCandidates => "publish-candidates",
-            SetupStep::AddContact => "contacts add <username>",
-            SetupStep::VerifyContact => "verify <username>",
-            SetupStep::Discover => "discover <username>",
-            SetupStep::Connect => "connect <username>",
-            SetupStep::IceCheck => "ice-check <username>",
-            SetupStep::Negotiate => "negotiate <username>",
-            SetupStep::SecureSession => "secure-session <username>",
-            SetupStep::Punch => "punch <username>",
-            SetupStep::Ready => "listen  →  send <username> \"msg\"",
+            Screen::Dashboard => "Dashboard",
+            Screen::Chat => "Chat",
+            Screen::Contacts => "Contacts",
+            Screen::Network => "Network",
+            Screen::Registry => "Registry",
+            Screen::Messages => "Messages",
+            Screen::Settings => "Settings",
         }
     }
 
-    pub fn description(&self) -> &'static str {
-        match self {
-            SetupStep::Init => "Generate Ed25519 keypair & local profile",
-            SetupStep::Register => "Claim username on identity registry",
-            SetupStep::Online => "Announce presence session to registry",
-            SetupStep::PublishCandidates => "Upload ICE candidates (expires 60s)",
-            SetupStep::AddContact => "Fetch & store peer public key locally",
-            SetupStep::VerifyContact => "Mark peer fingerprint as trusted",
-            SetupStep::Discover => "Resolve peer status & candidate list",
-            SetupStep::Connect => "Initialise local connection profile",
-            SetupStep::IceCheck => "Run concurrent connectivity checks",
-            SetupStep::Negotiate => "Derive deterministic session ID",
-            SetupStep::SecureSession => "Bootstrap ChaCha20-Poly1305 keys",
-            SetupStep::Punch => "Concurrent UDP hole-punch handshake",
-            SetupStep::Ready => "Start listener & exchange messages",
-        }
+    pub fn index(self) -> usize {
+        Self::ALL.iter().position(|s| *s == self).unwrap_or(0)
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum StepStatus {
-    Done,
-    Active,
-    Pending,
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MessagesTab {
+    Inbox,
+    Unread,
+    Requests,
+}
+
+#[derive(Debug, Clone)]
+pub struct ChatRow {
+    pub username: String,
+    pub total: usize,
+    pub unread: usize,
+    pub last_activity: Option<chrono::DateTime<chrono::Utc>>,
+    pub trust: TrustLevel,
+    pub account_status: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct ChecklistItem {
+    pub label: &'static str,
+    pub detail: &'static str,
+    pub done: bool,
+    pub command: Command,
+}
+
+#[derive(Debug, Clone)]
+pub struct Toast {
+    pub text: String,
+    pub kind: ToastKind,
+    pub created_tick: u64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ToastKind {
+    Info,
+    Success,
+    Error,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LogKind {
+    Info,
+    Success,
+    Error,
+}
+
+#[derive(Debug, Clone)]
+pub struct LogEntry {
+    pub text: String,
+    pub kind: LogKind,
+    pub at: chrono::DateTime<chrono::Local>,
+}
+
+#[derive(Debug, Clone)]
+pub struct InfoState {
+    pub title: String,
+    pub lines: Vec<String>,
+    pub scroll: u16,
+}
+
+#[derive(Debug, Clone)]
+pub struct SecretState {
+    pub title: String,
+    pub code: String,
+    pub warning: String,
+    pub revealed: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct ConfirmState {
+    pub title: String,
+    pub message: String,
+    pub phrase: Option<String>,
+    pub input: String,
+    pub request: RunRequest,
+}
+
+#[derive(Debug, Clone)]
+pub enum Modal {
+    Help,
+    Info(InfoState),
+    Secret(SecretState),
+    Form(FormState),
+    Confirm(ConfirmState),
+    TaskLog,
+}
+
+#[derive(Debug, Clone)]
+pub struct PaletteState {
+    pub query: String,
+    pub selected: usize,
 }
 
 pub struct AppState {
-    // Identity
-    pub username: Option<String>,
-    pub fingerprint: Option<String>,
-    pub is_online: bool,
-    pub registry_url: String,
+    // identity
+    pub profile: Option<Profile>,
+    pub online: bool,
+    pub session_id: Option<String>,
+    pub storage_dir: String,
 
-    // Screen
-    pub current_screen: Screen,
-    pub show_help: bool,
+    // navigation
+    pub screen: Screen,
+    pub should_quit: bool,
 
-    // Setup wizard
-    pub setup_steps: Vec<(SetupStep, StepStatus)>,
-    pub wizard_scroll: usize,
-
-    // Contacts panel
+    // data
     pub contacts: Vec<Contact>,
-    pub selected_contact_idx: usize,
-
-    // Chat
-    pub active_peer: Option<String>,
+    pub contact_index: usize,
+    pub chats: Vec<ChatRow>,
+    pub chat_index: usize,
     pub messages: Vec<Message>,
-    pub chat_scroll: usize,
-    pub input_buffer: String,
-    pub input_cursor: usize,
-
-    // Connection info
+    pub chat_offset: usize,
+    pub chat_focus: bool,
+    pub composer: String,
+    pub peers: Vec<PeerSession>,
+    pub peer_index: usize,
     pub punch_sessions: Vec<PunchSession>,
+    pub secure_sessions: Vec<SecureSession>,
+    pub ice_sessions: Vec<IceSession>,
+    pub publication: Option<CandidatePublication>,
+    pub capabilities: Option<PeerCapabilities>,
+    pub requests: Vec<MessageRequest>,
+    pub request_index: usize,
+    pub unread: Vec<(String, Message)>,
+    pub messages_tab: MessagesTab,
+    pub messages_index: usize,
 
-    // Status bar
-    pub status_message: Option<String>,
-    pub status_is_error: bool,
+    // registry
+    pub search_query: String,
+    pub search_focus: bool,
+    pub search_results: Vec<SearchResult>,
+    pub search_index: usize,
+    pub lookup: Option<UserLookupResponse>,
 
-    // Tick counter for animations
+    // dashboard
+    pub checklist: Vec<ChecklistItem>,
+    pub checklist_index: usize,
+
+    // overlays
+    pub modal: Option<Modal>,
+    pub palette: Option<PaletteState>,
+    pub toasts: Vec<Toast>,
+    pub task_log: Vec<LogEntry>,
+
+    // runtime
+    pub listener_running: bool,
+    pub heartbeat_running: bool,
+    pub running_tasks: usize,
     pub tick: u64,
 }
 
 impl AppState {
     pub fn new() -> Self {
-        // Load profile from disk (best-effort)
-        let (username, fingerprint, registry_url, is_online) =
-            if let Ok(profile) = crate::storage::filesystem::read_profile() {
-                let online = crate::session::manager::is_online();
-                (
-                    profile.username,
-                    profile.fingerprint,
-                    profile.registry_url,
-                    online,
-                )
-            } else {
-                (
-                    None,
-                    None,
-                    "https://user-registry-ten.vercel.app".to_string(),
-                    false,
-                )
-            };
-
-        // Load contacts (best-effort)
-        let contacts = crate::contacts::manager::load_contacts().unwrap_or_default();
-
-        // Load punch sessions (best-effort)
-        let punch_sessions = crate::punch::session::load_punch_sessions().unwrap_or_default();
-
-        // Determine wizard step statuses
-        let setup_steps = Self::compute_wizard_steps(
-            &username,
-            is_online,
-            &contacts,
-            &punch_sessions,
-        );
-
-        // Pick first contact as active peer
-        let active_peer = contacts.first().map(|c| c.username.clone());
-        let messages = if let Some(ref peer) = active_peer {
-            crate::chat::storage::load_messages(peer).unwrap_or_default()
-        } else {
-            Vec::new()
-        };
-        let chat_scroll = messages.len().saturating_sub(1);
-
-        AppState {
-            username,
-            fingerprint,
-            is_online,
-            registry_url,
-            current_screen: Screen::Dashboard,
-            show_help: false,
-            setup_steps,
-            wizard_scroll: 0,
-            contacts,
-            selected_contact_idx: 0,
-            active_peer,
-            messages,
-            chat_scroll,
-            input_buffer: String::new(),
-            input_cursor: 0,
-            punch_sessions,
-            status_message: None,
-            status_is_error: false,
+        let mut state = Self {
+            profile: None,
+            online: false,
+            session_id: None,
+            storage_dir: String::new(),
+            screen: Screen::Dashboard,
+            should_quit: false,
+            contacts: Vec::new(),
+            contact_index: 0,
+            chats: Vec::new(),
+            chat_index: 0,
+            messages: Vec::new(),
+            chat_offset: 0,
+            chat_focus: false,
+            composer: String::new(),
+            peers: Vec::new(),
+            peer_index: 0,
+            punch_sessions: Vec::new(),
+            secure_sessions: Vec::new(),
+            ice_sessions: Vec::new(),
+            publication: None,
+            capabilities: None,
+            requests: Vec::new(),
+            request_index: 0,
+            unread: Vec::new(),
+            messages_tab: MessagesTab::Inbox,
+            messages_index: 0,
+            search_query: String::new(),
+            search_focus: false,
+            search_results: Vec::new(),
+            search_index: 0,
+            lookup: None,
+            checklist: Vec::new(),
+            checklist_index: 0,
+            modal: None,
+            palette: None,
+            toasts: Vec::new(),
+            task_log: Vec::new(),
+            listener_running: false,
+            heartbeat_running: false,
+            running_tasks: 0,
             tick: 0,
-        }
+        };
+        state.refresh_all();
+        state
     }
 
-    fn compute_wizard_steps(
-        username: &Option<String>,
-        is_online: bool,
-        contacts: &[Contact],
-        punch_sessions: &[PunchSession],
-    ) -> Vec<(SetupStep, StepStatus)> {
-        let initialized = username.is_some();
-        let registered = username.is_some();
-        let online = is_online;
-        let has_candidates = {
-            // Check if punch sessions exist as proxy for candidates published
-            let storage = crate::storage::filesystem::get_storage_dir().ok();
-            storage
-                .map(|d| d.join("candidates.json").exists())
-                .unwrap_or(false)
-        };
-        let has_contacts = !contacts.is_empty();
-        let has_verified = contacts.iter().any(|c| c.trust_level == TrustLevel::Verified);
-        let has_punch = !punch_sessions.is_empty();
-        let punch_established = punch_sessions
+    // ── Identity helpers ────────────────────────────────────────────────
+    pub fn username(&self) -> String {
+        self.profile
+            .as_ref()
+            .and_then(|p| p.username.clone())
+            .unwrap_or_else(|| "not registered".to_string())
+    }
+
+    pub fn fingerprint(&self) -> String {
+        self.profile
+            .as_ref()
+            .and_then(|p| p.fingerprint.clone())
+            .unwrap_or_else(|| "—".to_string())
+    }
+
+    pub fn registry_url(&self) -> String {
+        self.profile
+            .as_ref()
+            .map(|p| p.registry_url.clone())
+            .unwrap_or_else(|| "https://user-registry-ten.vercel.app".to_string())
+    }
+
+    pub fn has_identity(&self) -> bool {
+        self.profile.is_some()
+    }
+
+    pub fn is_registered(&self) -> bool {
+        self.profile
+            .as_ref()
+            .and_then(|p| p.username.as_ref())
+            .map(|u| !u.is_empty())
+            .unwrap_or(false)
+    }
+
+    pub fn current_contact(&self) -> Option<&Contact> {
+        self.contacts.get(self.contact_index)
+    }
+
+    pub fn current_contact_name(&self) -> Option<String> {
+        self.current_contact().map(|c| c.username.clone())
+    }
+
+    pub fn current_peer(&self) -> Option<&PeerSession> {
+        let name = self.current_network_target()?;
+        self.peer_for(&name)
+    }
+
+    pub fn current_peer_name(&self) -> Option<String> {
+        self.current_peer().map(|p| p.username.clone())
+    }
+
+    /// Find an active peer session by username.
+    pub fn peer_for(&self, name: &str) -> Option<&PeerSession> {
+        self.peers
             .iter()
-            .any(|s| s.state == crate::punch::state::PunchState::Established);
-
-        // Connection session file exists?
-        let has_connection = {
-            let storage = crate::storage::filesystem::get_storage_dir().ok();
-            storage
-                .map(|d| d.join("connections.json").exists())
-                .unwrap_or(false)
-        };
-        let has_secure = {
-            let storage = crate::storage::filesystem::get_storage_dir().ok();
-            storage
-                .map(|d| d.join("secure_sessions.json").exists())
-                .unwrap_or(false)
-        };
-        let has_ice = {
-            let storage = crate::storage::filesystem::get_storage_dir().ok();
-            storage
-                .map(|d| d.join("ice_results.json").exists())
-                .unwrap_or(false)
-        };
-
-        let steps_done: &[bool] = &[
-            initialized,                // Init
-            registered,                 // Register
-            online,                     // Online
-            has_candidates,             // PublishCandidates
-            has_contacts,               // AddContact
-            has_verified,               // VerifyContact
-            has_contacts,               // Discover (proxy)
-            has_connection,             // Connect
-            has_ice,                    // IceCheck
-            has_ice,                    // Negotiate (proxy)
-            has_secure,                 // SecureSession
-            has_punch,                  // Punch
-            punch_established,          // Ready
-        ];
-
-        let mut found_active = false;
-        SetupStep::all()
-            .into_iter()
-            .zip(steps_done.iter())
-            .map(|(step, &done)| {
-                if done {
-                    (step, StepStatus::Done)
-                } else if !found_active {
-                    found_active = true;
-                    (step, StepStatus::Active)
-                } else {
-                    (step, StepStatus::Pending)
-                }
-            })
-            .collect()
+            .find(|peer| peer.username.eq_ignore_ascii_case(name))
     }
 
-    pub fn refresh(&mut self) {
-        // Reload profile
-        if let Ok(profile) = crate::storage::filesystem::read_profile() {
-            self.username = profile.username;
-            self.fingerprint = profile.fingerprint;
-            self.registry_url = profile.registry_url;
-        }
-        self.is_online = crate::session::manager::is_online();
-        self.contacts = crate::contacts::manager::load_contacts().unwrap_or_default();
-        self.punch_sessions = crate::punch::session::load_punch_sessions().unwrap_or_default();
-        self.setup_steps = Self::compute_wizard_steps(
-            &self.username,
-            self.is_online,
-            &self.contacts,
-            &self.punch_sessions,
-        );
-        // Reload messages for active peer
-        if let Some(ref peer) = self.active_peer {
-            self.messages = crate::chat::storage::load_messages(peer).unwrap_or_default();
-            // Auto-scroll to bottom on refresh
-            if !self.messages.is_empty() {
-                self.chat_scroll = self.messages.len() - 1;
+    /// Names available on the Network screen: active peer sessions first,
+    /// followed by contacts that do not have a session yet. This lets every
+    /// network action be started from the TUI even before a session exists.
+    pub fn network_targets(&self) -> Vec<String> {
+        let mut targets: Vec<String> = Vec::new();
+        for peer in &self.peers {
+            if !targets
+                .iter()
+                .any(|name| name.eq_ignore_ascii_case(&peer.username))
+            {
+                targets.push(peer.username.clone());
             }
         }
+        for contact in &self.contacts {
+            if !targets
+                .iter()
+                .any(|name| name.eq_ignore_ascii_case(&contact.username))
+            {
+                targets.push(contact.username.clone());
+            }
+        }
+        targets
     }
 
-    pub fn select_contact(&mut self, idx: usize) {
-        if idx < self.contacts.len() {
-            self.selected_contact_idx = idx;
-            let peer = self.contacts[idx].username.clone();
-            self.messages = crate::chat::storage::load_messages(&peer).unwrap_or_default();
-            self.active_peer = Some(peer);
-            self.chat_scroll = self.messages.len().saturating_sub(1);
+    pub fn current_network_target(&self) -> Option<String> {
+        self.network_targets().get(self.peer_index).cloned()
+    }
+
+    pub fn current_chat(&self) -> Option<&ChatRow> {
+        self.chats.get(self.chat_index)
+    }
+
+    pub fn current_chat_name(&self) -> Option<String> {
+        self.current_chat().map(|c| c.username.clone())
+    }
+
+    pub fn current_request(&self) -> Option<&MessageRequest> {
+        let index = if self.screen == Screen::Messages && self.messages_tab == MessagesTab::Requests
+        {
+            self.messages_index
+        } else {
+            self.request_index
+        };
+        self.requests.get(index)
+    }
+
+    /// The best target for a contact/peer action. The current screen wins so
+    /// network screens never accidentally target an unrelated chat.
+    pub fn action_target(&self) -> Option<String> {
+        match self.screen {
+            Screen::Network => self
+                .current_network_target()
+                .or_else(|| self.current_contact_name())
+                .or_else(|| self.current_chat_name()),
+            Screen::Chat | Screen::Messages => self
+                .current_chat_name()
+                .or_else(|| self.current_contact_name())
+                .or_else(|| self.current_peer_name()),
+            _ => self
+                .current_contact_name()
+                .or_else(|| self.current_chat_name())
+                .or_else(|| self.current_peer_name()),
         }
     }
 
-    pub fn next_contact(&mut self) {
-        if !self.contacts.is_empty() {
-            self.selected_contact_idx =
-                (self.selected_contact_idx + 1) % self.contacts.len();
-            self.select_contact(self.selected_contact_idx);
+    /// Target for commands that only make sense on a stored contact.
+    ///
+    /// On the Contacts screen the selection is authoritative. Elsewhere the
+    /// generic action target is used, but only when it really is a contact, so
+    /// a chat or peer session can never be passed to a contact mutation.
+    pub fn contact_target(&self) -> Option<String> {
+        if self.screen == Screen::Contacts {
+            return self.current_contact_name();
         }
-    }
-
-    pub fn prev_contact(&mut self) {
-        if !self.contacts.is_empty() {
-            self.selected_contact_idx = self.selected_contact_idx
-                .checked_sub(1)
-                .unwrap_or(self.contacts.len() - 1);
-            self.select_contact(self.selected_contact_idx);
-        }
-    }
-
-    pub fn scroll_chat_up(&mut self) {
-        self.chat_scroll = self.chat_scroll.saturating_sub(1);
-    }
-
-    pub fn scroll_chat_down(&mut self) {
-        if !self.messages.is_empty() && self.chat_scroll < self.messages.len() - 1 {
-            self.chat_scroll += 1;
-        }
-    }
-
-    pub fn active_step_command(&self) -> Option<String> {
-        self.setup_steps
+        let name = self.action_target()?;
+        self.contacts
             .iter()
-            .find(|(_, status)| *status == StepStatus::Active)
-            .map(|(step, _)| format!("rust-messenger {}", step.label()))
+            .any(|contact| contact.username.eq_ignore_ascii_case(&name))
+            .then_some(name)
     }
 
-    pub fn connection_status_for_peer(&self, peer: &str) -> &'static str {
-        let session = self.punch_sessions.iter().find(|s| s.peer.eq_ignore_ascii_case(peer));
-        match session {
-            Some(s) if s.state == crate::punch::state::PunchState::Established => "CONNECTED",
-            Some(_) => "PUNCHING",
-            None => "OFFLINE",
-        }
+    pub fn punch_state_for(&self, peer: &str) -> Option<PunchState> {
+        self.punch_sessions
+            .iter()
+            .find(|s| s.peer.eq_ignore_ascii_case(peer))
+            .map(|s| s.state)
     }
 
-    pub fn unread_count_for(&self, peer: &str) -> usize {
-        crate::chat::storage::load_messages(peer)
+    pub fn is_connected(&self, peer: &str) -> bool {
+        self.punch_state_for(peer) == Some(PunchState::Established)
+            || self.peers.iter().any(|p| {
+                p.username.eq_ignore_ascii_case(peer) && p.state.to_string() == "CONNECTED"
+            })
+    }
+
+    pub fn has_ice(&self, peer: &str) -> bool {
+        self.ice_sessions
+            .iter()
+            .any(|s| s.peer.eq_ignore_ascii_case(peer))
+    }
+
+    pub fn has_secure(&self, peer: &str) -> bool {
+        self.secure_sessions
+            .iter()
+            .any(|s| s.peer.eq_ignore_ascii_case(peer) && s.established)
+    }
+
+    pub fn unread_count(&self, peer: &str) -> usize {
+        load_messages(peer)
             .unwrap_or_default()
             .iter()
-            .filter(|m| {
-                m.direction == Direction::Incoming && m.status != MessageStatus::Read
-            })
+            .filter(|m| m.direction == Direction::Incoming && m.status != MessageStatus::Read)
             .count()
+    }
+
+    pub fn publication_seconds_left(&self) -> Option<i64> {
+        let publ = self.publication.as_ref()?;
+        let expires = chrono::DateTime::parse_from_rfc3339(&publ.expires_at).ok()?;
+        Some((expires.with_timezone(&chrono::Utc) - chrono::Utc::now()).num_seconds())
+    }
+
+    // ── Refresh ─────────────────────────────────────────────────────────
+    pub fn refresh_all(&mut self) {
+        self.profile = read_profile().ok();
+        self.online = is_online();
+        self.session_id = crate::session::manager::load_session()
+            .ok()
+            .map(|s| s.session_id);
+
+        self.contacts = load_contacts().unwrap_or_default();
+        self.peers = load_sessions().unwrap_or_default();
+        self.punch_sessions = load_punch_sessions().unwrap_or_default();
+        self.secure_sessions = load_secure_sessions().unwrap_or_default();
+        self.ice_sessions = load_ice_sessions().unwrap_or_default();
+        self.publication = CandidateManager::load_publication().ok();
+        self.capabilities = load_local_capabilities().ok();
+        self.requests = load_requests().unwrap_or_default();
+        self.unread = MessageManager::get_unread_messages().unwrap_or_default();
+        self.storage_dir = get_storage_dir()
+            .map(|p| p.display().to_string())
+            .unwrap_or_else(|_| "~/.rust-messenger".to_string());
+
+        self.rebuild_chats();
+        self.reload_messages();
+        self.rebuild_checklist();
+        self.clamp_selections();
+    }
+
+    fn rebuild_chats(&mut self) {
+        let mut rows = Vec::new();
+        for summary in list_conversations().unwrap_or_default() {
+            let contact = self
+                .contacts
+                .iter()
+                .find(|c| c.username.eq_ignore_ascii_case(&summary.username));
+            let unread = load_messages(&summary.username)
+                .unwrap_or_default()
+                .iter()
+                .filter(|m| m.direction == Direction::Incoming && m.status != MessageStatus::Read)
+                .count();
+            rows.push(ChatRow {
+                username: summary.username,
+                total: summary.total_messages,
+                unread,
+                last_activity: summary.last_activity,
+                trust: contact
+                    .map(|c| c.trust_level)
+                    .unwrap_or(TrustLevel::Unverified),
+                account_status: contact
+                    .map(|c| c.account_status.clone())
+                    .unwrap_or_else(|| "UNKNOWN".to_string()),
+            });
+        }
+
+        // Contacts without a conversation still deserve a chat row.
+        for contact in &self.contacts {
+            if !rows
+                .iter()
+                .any(|r| r.username.eq_ignore_ascii_case(&contact.username))
+            {
+                rows.push(ChatRow {
+                    username: contact.username.clone(),
+                    total: 0,
+                    unread: 0,
+                    last_activity: None,
+                    trust: contact.trust_level,
+                    account_status: contact.account_status.clone(),
+                });
+            }
+        }
+
+        rows.sort_by(|a, b| match (a.last_activity, b.last_activity) {
+            (Some(x), Some(y)) => y.cmp(&x),
+            (Some(_), None) => std::cmp::Ordering::Less,
+            (None, Some(_)) => std::cmp::Ordering::Greater,
+            (None, None) => a.username.cmp(&b.username),
+        });
+
+        let current = self.current_chat_name();
+        self.chats = rows;
+        if let Some(name) = current
+            && let Some(idx) = self
+                .chats
+                .iter()
+                .position(|c| c.username.eq_ignore_ascii_case(&name))
+        {
+            self.chat_index = idx;
+        }
+    }
+
+    pub fn reload_messages(&mut self) {
+        let peer = self.current_chat_name();
+        if let Some(peer) = peer {
+            self.messages = load_messages(&peer).unwrap_or_default();
+            let max_offset = self.messages.len().saturating_sub(1);
+            self.chat_offset = self.chat_offset.min(max_offset);
+        } else {
+            self.messages.clear();
+            self.chat_offset = 0;
+        }
+    }
+
+    pub fn open_chat(&mut self, peer: &str, focus_composer: bool) {
+        if let Some(idx) = self
+            .chats
+            .iter()
+            .position(|c| c.username.eq_ignore_ascii_case(peer))
+        {
+            self.chat_index = idx;
+        } else if let Some(contact) = self
+            .contacts
+            .iter()
+            .find(|c| c.username.eq_ignore_ascii_case(peer))
+        {
+            self.chats.push(ChatRow {
+                username: contact.username.clone(),
+                total: 0,
+                unread: 0,
+                last_activity: None,
+                trust: contact.trust_level,
+                account_status: contact.account_status.clone(),
+            });
+            self.chat_index = self.chats.len() - 1;
+        }
+        self.screen = Screen::Chat;
+        self.chat_offset = 0;
+        self.chat_focus = focus_composer;
+        self.reload_messages();
+    }
+
+    fn rebuild_checklist(&mut self) {
+        let peer = self.action_target();
+        let peer_connected = peer
+            .as_deref()
+            .map(|p| self.is_connected(p))
+            .unwrap_or(false);
+        let peer_ice = peer.as_deref().map(|p| self.has_ice(p)).unwrap_or(false);
+        let publication_ok = self
+            .publication_seconds_left()
+            .map(|s| s > 0)
+            .unwrap_or(false);
+        let verified = self
+            .contacts
+            .iter()
+            .any(|c| c.trust_level == TrustLevel::Verified);
+        let punch_established = self
+            .punch_sessions
+            .iter()
+            .any(|s| s.state == PunchState::Established);
+
+        self.checklist = vec![
+            ChecklistItem {
+                label: "Initialize identity",
+                detail: "Generate Ed25519 keys and local profile",
+                done: self.has_identity(),
+                command: Command::Init,
+            },
+            ChecklistItem {
+                label: "Register username",
+                detail: "Claim your name on the registry",
+                done: self.is_registered(),
+                command: Command::Register,
+            },
+            ChecklistItem {
+                label: "Go online",
+                detail: "Announce presence and start heartbeat",
+                done: self.online,
+                command: Command::Online,
+            },
+            ChecklistItem {
+                label: "Publish ICE candidates",
+                detail: "Upload network candidates (expires in 60s)",
+                done: publication_ok,
+                command: Command::PublishCandidates,
+            },
+            ChecklistItem {
+                label: "Add a contact",
+                detail: "Fetch and store a peer public key",
+                done: !self.contacts.is_empty(),
+                command: Command::AddContact,
+            },
+            ChecklistItem {
+                label: "Verify a contact",
+                detail: "Mark a fingerprint as trusted",
+                done: verified,
+                command: Command::Verify,
+            },
+            ChecklistItem {
+                label: "Run ICE check",
+                detail: "Find a reachable candidate pair",
+                done: peer_ice,
+                command: Command::IceCheck,
+            },
+            ChecklistItem {
+                label: "Establish connection",
+                detail: "Secure session + UDP hole punch",
+                done: peer_connected && punch_established,
+                command: Command::Punch,
+            },
+            ChecklistItem {
+                label: "Start listener",
+                detail: "Receive messages in the background",
+                done: self.listener_running,
+                command: Command::Listen,
+            },
+            ChecklistItem {
+                label: "Open a chat",
+                detail: "Send an end-to-end encrypted message",
+                done: !self.messages.is_empty(),
+                command: Command::SendEncrypted,
+            },
+        ];
+        self.checklist_index = self
+            .checklist_index
+            .min(self.checklist.len().saturating_sub(1));
+    }
+
+    fn clamp_selections(&mut self) {
+        if !self.contacts.is_empty() {
+            self.contact_index = self.contact_index.min(self.contacts.len() - 1);
+        } else {
+            self.contact_index = 0;
+        }
+        let target_len = self.network_targets().len();
+        if target_len > 0 {
+            self.peer_index = self.peer_index.min(target_len - 1);
+        } else {
+            self.peer_index = 0;
+        }
+        if !self.chats.is_empty() {
+            self.chat_index = self.chat_index.min(self.chats.len() - 1);
+        } else {
+            self.chat_index = 0;
+        }
+        if !self.requests.is_empty() {
+            self.request_index = self.request_index.min(self.requests.len() - 1);
+        } else {
+            self.request_index = 0;
+        }
+        if !self.search_results.is_empty() {
+            self.search_index = self.search_index.min(self.search_results.len() - 1);
+        } else {
+            self.search_index = 0;
+        }
+        let message_len = self.message_row_count();
+        if message_len > 0 {
+            self.messages_index = self.messages_index.min(message_len - 1);
+        } else {
+            self.messages_index = 0;
+        }
+    }
+
+    pub fn message_row_count(&self) -> usize {
+        match self.messages_tab {
+            MessagesTab::Inbox => self.chats.len(),
+            MessagesTab::Unread => self.unread.len(),
+            MessagesTab::Requests => self.requests.len(),
+        }
+    }
+
+    // ── Toasts / logs ───────────────────────────────────────────────────
+    pub fn toast(&mut self, text: impl Into<String>, kind: ToastKind) {
+        self.toasts.push(Toast {
+            text: text.into(),
+            kind,
+            created_tick: self.tick,
+        });
+        if self.toasts.len() > 4 {
+            self.toasts.remove(0);
+        }
+    }
+
+    pub fn expire_toasts(&mut self) {
+        self.toasts
+            .retain(|t| self.tick.saturating_sub(t.created_tick) < 60);
+    }
+
+    pub fn log(&mut self, text: impl Into<String>, kind: LogKind) {
+        self.task_log.push(LogEntry {
+            text: text.into(),
+            kind,
+            at: chrono::Local::now(),
+        });
+        if self.task_log.len() > 250 {
+            self.task_log.remove(0);
+        }
+    }
+
+    pub fn open_form(&mut self, kind: FormKind, prefill: Option<&str>) {
+        self.modal = Some(Modal::Form(FormState::new(kind, prefill)));
+    }
+
+    pub fn open_info(&mut self, title: impl Into<String>, lines: Vec<String>) {
+        self.modal = Some(Modal::Info(InfoState {
+            title: title.into(),
+            lines,
+            scroll: 0,
+        }));
+    }
+
+    pub fn open_confirm(
+        &mut self,
+        title: impl Into<String>,
+        message: impl Into<String>,
+        phrase: Option<&str>,
+        request: RunRequest,
+    ) {
+        self.modal = Some(Modal::Confirm(ConfirmState {
+            title: title.into(),
+            message: message.into(),
+            phrase: phrase.map(|s| s.to_string()),
+            input: String::new(),
+            request,
+        }));
+    }
+
+    pub fn task_log_lines(&self) -> Vec<String> {
+        if self.task_log.is_empty() {
+            return vec!["No activity yet.".to_string()];
+        }
+        self.task_log
+            .iter()
+            .rev()
+            .take(120)
+            .rev()
+            .map(|e| format!("{}  {}", e.at.format("%H:%M:%S"), e.text))
+            .collect()
     }
 }

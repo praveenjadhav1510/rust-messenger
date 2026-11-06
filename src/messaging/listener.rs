@@ -11,7 +11,15 @@ use chrono::Utc;
 use sha2::{Digest, Sha256};
 use std::net::SocketAddr;
 use tokio::net::UdpSocket;
+use tokio::sync::mpsc::UnboundedSender;
 use uuid::Uuid;
+
+/// Events emitted by the quiet listener used by the TUI.
+#[derive(Debug, Clone)]
+pub enum ListenerEvent {
+    Incoming { peer: String, content: String },
+    Ack { peer: String, status: MessageStatus },
+}
 
 pub struct MessageListener;
 
@@ -24,7 +32,8 @@ pub fn get_listener_port() -> Result<u16> {
         .find(|s| s.state == crate::punch::state::PunchState::Established);
 
     if let Some(session) = established {
-        let is_loopback = session.selected_pair.local.address == session.selected_pair.remote.address
+        let is_loopback = session.selected_pair.local.address
+            == session.selected_pair.remote.address
             || session.selected_pair.local.address == "127.0.0.1"
             || session.selected_pair.local.address == "localhost"
             || session.selected_pair.remote.address == "127.0.0.1"
@@ -55,10 +64,22 @@ pub fn get_secure_session_key(session_id: &str) -> [u8; 32] {
 
 impl MessageListener {
     pub async fn run() -> Result<()> {
+        Self::run_inner(None).await
+    }
+
+    /// Quiet listener variant used by the TUI. It never writes to stdout and
+    /// reports incoming traffic through the supplied channel.
+    pub async fn run_notifying(tx: UnboundedSender<ListenerEvent>) -> Result<()> {
+        Self::run_inner(Some(tx)).await
+    }
+
+    async fn run_inner(notify: Option<UnboundedSender<ListenerEvent>>) -> Result<()> {
         let port = get_listener_port()?;
         let socket = UdpSocket::bind(format!("0.0.0.0:{}", port)).await?;
-        println!("Listening for incoming messages...");
-        println!();
+        if notify.is_none() {
+            println!("Listening for incoming messages...");
+            println!();
+        }
 
         let mut buf = vec![0u8; 65535];
         loop {
@@ -66,12 +87,16 @@ impl MessageListener {
                 Ok((len, from_addr)) => {
                     if let Ok(payload_str) = std::str::from_utf8(&buf[..len]) {
                         if let Ok(packet) = Packet::decode(payload_str) {
-                            let _ = Self::handle_packet(packet, from_addr, &socket).await;
+                            let _ =
+                                Self::handle_packet(packet, from_addr, &socket, notify.as_ref())
+                                    .await;
                         }
                     }
                 }
                 Err(e) => {
-                    eprintln!("Error receiving packet: {}", e);
+                    if notify.is_none() {
+                        eprintln!("Error receiving packet: {}", e);
+                    }
                 }
             }
         }
@@ -81,6 +106,7 @@ impl MessageListener {
         packet: Packet,
         from_addr: SocketAddr,
         socket: &UdpSocket,
+        notify: Option<&UnboundedSender<ListenerEvent>>,
     ) -> Result<()> {
         match packet.packet_type {
             PacketType::Message => {
@@ -124,11 +150,18 @@ impl MessageListener {
                     timestamp: Utc::now(),
                     status: MessageStatus::Delivered,
                     message_type: MessageType::Text,
-                    content: plaintext,
+                    content: plaintext.clone(),
                     signature: None,
                     reply_to: None,
                 };
                 append_message(&msg_payload.sender, message)?;
+
+                if let Some(tx) = notify {
+                    let _ = tx.send(ListenerEvent::Incoming {
+                        peer: msg_payload.sender.clone(),
+                        content: plaintext.clone(),
+                    });
+                }
 
                 // Reply with MESSAGE_ACK
                 let ack_payload = serde_json::json!({
@@ -161,6 +194,12 @@ impl MessageListener {
                         ack.message_id,
                         MessageStatus::Delivered,
                     );
+                    if let Some(tx) = notify {
+                        let _ = tx.send(ListenerEvent::Ack {
+                            peer: packet.sender.clone(),
+                            status: MessageStatus::Delivered,
+                        });
+                    }
                 }
             }
             PacketType::MessageRead => {

@@ -47,7 +47,8 @@ async fn send_read_receipt_packet(peer: &str, message_id: Uuid) -> Result<()> {
         .find(|s| s.peer.eq_ignore_ascii_case(peer))
         .ok_or_else(|| anyhow!("No established punch session found for peer: {}", peer))?;
 
-    let is_loopback = punch_session.selected_pair.local.address == punch_session.selected_pair.remote.address
+    let is_loopback = punch_session.selected_pair.local.address
+        == punch_session.selected_pair.remote.address
         || punch_session.selected_pair.local.address == "127.0.0.1"
         || punch_session.selected_pair.local.address == "localhost"
         || punch_session.selected_pair.remote.address == "127.0.0.1"

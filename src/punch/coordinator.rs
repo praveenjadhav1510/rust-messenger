@@ -54,6 +54,15 @@ impl HolePunchCoordinator {
     }
 
     pub async fn start_punch(&self) -> Result<PunchSession> {
+        self.start_punch_with_progress(true).await
+    }
+
+    /// Punch without writing progress to stdout (used by the TUI).
+    pub async fn start_punch_quiet(&self) -> Result<PunchSession> {
+        self.start_punch_with_progress(false).await
+    }
+
+    async fn start_punch_with_progress(&self, verbose: bool) -> Result<PunchSession> {
         let is_loopback = (self.selected_pair.local.address == "127.0.0.1"
             || self.selected_pair.local.address == "localhost")
             && (self.selected_pair.remote.address == "127.0.0.1"
@@ -72,15 +81,19 @@ impl HolePunchCoordinator {
         let remote_addr: SocketAddr =
             format!("{}:{}", self.selected_pair.remote.address, remote_port).parse()?;
 
-        println!("Starting UDP hole punching...");
-        println!();
+        if verbose {
+            println!("Starting UDP hole punching...");
+            println!();
+        }
 
         let mut attempts = 0;
         let mut final_state = PunchState::Failed;
 
         for attempt in 1..=10 {
             attempts = attempt;
-            println!("Attempt {}/10", attempt);
+            if verbose {
+                println!("Attempt {}/10", attempt);
+            }
 
             self.send_probe(remote_addr).await?;
 

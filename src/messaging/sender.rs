@@ -103,7 +103,8 @@ impl MessageSender {
             signature: "message-signature".to_string(),
         };
 
-        let is_loopback = punch_session.selected_pair.local.address == punch_session.selected_pair.remote.address
+        let is_loopback = punch_session.selected_pair.local.address
+            == punch_session.selected_pair.remote.address
             || punch_session.selected_pair.local.address == "127.0.0.1"
             || punch_session.selected_pair.local.address == "localhost"
             || punch_session.selected_pair.remote.address == "127.0.0.1"
@@ -131,8 +132,7 @@ impl MessageSender {
         // Try to bind with SO_REUSEPORT so we share the NAT-punched port
         // with any running listener.  Fall back to an ephemeral port only
         // when reuseport itself fails (very unusual).
-        let std_socket = bind_reusable_udp(local_port)
-            .or_else(|_| bind_reusable_udp(0))?;
+        let std_socket = bind_reusable_udp(local_port).or_else(|_| bind_reusable_udp(0))?;
         let socket = UdpSocket::from_std(std_socket)?;
 
         let ack_received =
@@ -230,7 +230,8 @@ impl MessageSender {
             signature: "message-signature".to_string(),
         };
 
-        let is_loopback = punch_session.selected_pair.local.address == punch_session.selected_pair.remote.address
+        let is_loopback = punch_session.selected_pair.local.address
+            == punch_session.selected_pair.remote.address
             || punch_session.selected_pair.local.address == "127.0.0.1"
             || punch_session.selected_pair.local.address == "localhost"
             || punch_session.selected_pair.remote.address == "127.0.0.1"
@@ -256,8 +257,7 @@ impl MessageSender {
         .parse()?;
 
         // Same reusable-port binding as send_message.
-        let std_socket = bind_reusable_udp(local_port)
-            .or_else(|_| bind_reusable_udp(0))?;
+        let std_socket = bind_reusable_udp(local_port).or_else(|_| bind_reusable_udp(0))?;
         let socket = UdpSocket::from_std(std_socket)?;
 
         let ack_received =

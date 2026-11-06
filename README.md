@@ -87,7 +87,43 @@ cargo install --path .
 | `inbox` | `rust-messenger inbox` | Lists recent conversations and their total messages. |
 | `unread` | `rust-messenger unread` | Lists all unread incoming messages. |
 | `dev` | `rust-messenger dev <subcommand>` | Developer simulation tools (inject). |
+| `tui` | `rust-messenger` / `rust-messenger tui` | Launches the full-screen terminal UI (identity, chat, contacts, network, registry, messages and settings). |
 
+
+---
+
+## Terminal User Interface
+
+Running the binary with no subcommand on an interactive terminal opens the
+full-screen TUI. It can also be launched explicitly:
+
+```bash
+rust-messenger tui
+# or, when building from source
+cargo run
+```
+
+Every CLI operation is reachable from the TUI — either from the screen that
+owns it, from the command palette (`Ctrl+P` or `:`), or from the dashboard
+checklist. Operations run in the background, and progress is reported in the
+activity log (`F8`).
+
+Screens:
+
+| Screen | Key | What you can do |
+| :--- | :--- | :--- |
+| Dashboard | `1` / `F1` | Setup checklist, identity, runtime status, one-key actions |
+| Chat | `2` / `F2` | Read conversations, send end-to-end encrypted messages (`Enter`), queue locally (`Ctrl+Q`), mark read, clear |
+| Contacts | `3` / `F3` | Add, remove, verify, unverify, block, ping, connect, open chat |
+| Network | `4` / `F4` | Select a peer or contact target, discover, negotiate, ICE check, punch, secure session, publish/fetch candidates |
+| Registry | `5` | Search, look up, register, recover, rename, restore, lock, unlock, delete |
+| Messages | `6` | Inbox, unread messages, and message requests (`←` / `→` to switch tabs) |
+| Settings | `7` | Identity/account actions, listener, capabilities, test message injection |
+
+Global keys: `Tab` / `Shift+Tab` cycles screens, `F5` refreshes local state,
+`F6` toggles online, `F7` toggles the message listener, `F8` opens the activity
+log, `?` shows the full keyboard reference, and `Ctrl+C` exits. Pressing `q`
+quits unless a chat composer is active.
 
 ---
 
@@ -335,9 +371,9 @@ rust-messenger dev inject <username> "<message-text>"
 
 ```text
 Phase 1: Identity & Registry Client
-  └── Phase 3: Core Messaging Foundation (Current)
+  └── Phase 3: Core Messaging Foundation
         └── Phase 4: Peer-to-Peer Networking & Transport Encryption
-              └── Phase 5: Terminal User Interface (Ratatui)
+              └── Phase 5: Terminal User Interface (Ratatui) — Delivered
 ```
 
 ---
